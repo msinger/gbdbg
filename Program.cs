@@ -367,6 +367,18 @@ namespace gbdbg
 			return m.arg;
 		}
 
+		public static void WriteMem(ushort address, byte val)
+		{
+			SetDbgState(true);
+			ExecuteInternal(new byte[] { 0x7f }); // LD A, A
+			DbgState A = Read(0x000c);
+			ExecuteInternal(new byte[] { 0x3e, val }); // LD A, d8
+			ExecuteInternal(new byte[] { 0xea, (byte)address, (byte)(address >> 8) }); // LD (a16), A
+			ExecuteInternal(new byte[] { 0x3e, A.arg }); // LD A, d8
+			SetDbgState(false);
+			SetDrvData(DrvData.Default, 0);
+		}
+
 		public static void ShowMem(ushort address)
 		{
 			DbgState s = Read(0x0001);
@@ -383,6 +395,22 @@ namespace gbdbg
 
 			byte b = ReadMem(address);
 			Console.WriteLine("0x" + b.ToString("x2"));
+		}
+
+		public static void DoWriteMem(ushort address, byte val)
+		{
+			DbgState s = Read(0x0001);
+			if (s == null)
+			{
+				Console.WriteLine("Write mem failed!");
+				return;
+			}
+			if (!s.halt)
+			{
+				Console.WriteLine("Write mem failed: Not halted!");
+				return;
+			}
+			WriteMem(address, val);
 		}
 
 		private static string portfile;
@@ -497,6 +525,30 @@ namespace gbdbg
 							break;
 						}
 						ShowMem((ushort)address);
+					}
+					break;
+				case "wr":
+					if (a.Length != 3)
+					{
+						Console.WriteLine("Write byte");
+						Console.WriteLine("Usage: wr <address> <value>");
+						break;
+					}
+					{
+						int address, val;
+						if (!int.TryParse(a[1], NumberStyles.HexNumber, NumberFormatInfo.InvariantInfo, out address) ||
+							address < 0 || address > 0xffff)
+						{
+							Console.WriteLine("Invalid address");
+							break;
+						}
+						if (!int.TryParse(a[2], NumberStyles.HexNumber, NumberFormatInfo.InvariantInfo, out val) ||
+							val < 0 || val > 0xff)
+						{
+							Console.WriteLine("Invalid value");
+							break;
+						}
+						DoWriteMem((ushort)address, (byte)val);
 					}
 					break;
 				default:
