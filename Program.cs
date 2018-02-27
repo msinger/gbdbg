@@ -305,6 +305,50 @@ namespace gbdbg
 			Send(buf);
 		}
 
+		public static void SetAF(ushort af, bool restore_a)
+		{
+			DbgState s = Read(0x0001);
+			if (s == null)
+			{
+				Console.WriteLine("Set register failed!");
+				return;
+			}
+			if (!s.halt)
+			{
+				Console.WriteLine("Set register failed: Not halted!");
+				return;
+			}
+
+			SetDbgState(true);
+
+			DbgState SP;
+
+			ExecuteInternal(new byte[] { 0x7f }); // LD A, A
+			SP = Read(0x0f00);
+			if (SP == null) return;
+
+			byte meml, memh;
+			meml = ReadMem(0xdffe);
+			memh = ReadMem(0xdfff);
+
+			if (restore_a)
+				ExecuteInternal(new byte[] { 0xea, 0xff, 0xdf }); // LD (a16), A
+			else
+				WriteMem(0xdfff, (byte)(af >> 8));
+
+			WriteMem(0xdffe, (byte)af);
+
+			ExecuteInternal(new byte[] { 0x31, 0xfe, 0xdf }); // LD SP, d16
+			ExecuteInternal(new byte[] { 0xf1 }); // POP AF
+
+			WriteMem(0xdffe, meml);
+			WriteMem(0xdfff, memh);
+			ExecuteInternal(new byte[] { 0x31, (byte)SP.sp, (byte)(SP.sp >> 8) }); // LD SP, d16
+
+			SetDbgState(false);
+			SetDrvData(DrvData.Default, 0);
+		}
+
 		public static void SetReg(string reg, ushort val)
 		{
 			byte [] op;
@@ -325,6 +369,9 @@ namespace gbdbg
 			case "pc":
 				op = new byte[] { 0xc3, (byte)val, (byte)(val >> 8) }; // JP a16
 				break;
+			case "af":
+				SetAF(val, false);
+				return;
 			case "b":
 				op = new byte[] { 0x06, (byte)val }; // LD B, d8
 				break;
@@ -346,6 +393,9 @@ namespace gbdbg
 			case "a":
 				op = new byte[] { 0x3e, (byte)val }; // LD A, d8
 				break;
+			case "f":
+				SetAF(val, true);
+				return;
 			default:
 				Console.WriteLine("Invalid register");
 				return;
@@ -355,28 +405,22 @@ namespace gbdbg
 
 		public static byte ReadMem(ushort address)
 		{
-			SetDbgState(true);
 			ExecuteInternal(new byte[] { 0x7f }); // LD A, A
 			DbgState A = Read(0x000c);
 			ExecuteInternal(new byte[] { 0xfa, (byte)address, (byte)(address >> 8) }); // LD A, (a16)
 			ExecuteInternal(new byte[] { 0x7f }); // LD A, A
 			DbgState m = Read(0x000c);
 			ExecuteInternal(new byte[] { 0x3e, A.arg }); // LD A, d8
-			SetDbgState(false);
-			SetDrvData(DrvData.Default, 0);
 			return m.arg;
 		}
 
 		public static void WriteMem(ushort address, byte val)
 		{
-			SetDbgState(true);
 			ExecuteInternal(new byte[] { 0x7f }); // LD A, A
 			DbgState A = Read(0x000c);
 			ExecuteInternal(new byte[] { 0x3e, val }); // LD A, d8
 			ExecuteInternal(new byte[] { 0xea, (byte)address, (byte)(address >> 8) }); // LD (a16), A
 			ExecuteInternal(new byte[] { 0x3e, A.arg }); // LD A, d8
-			SetDbgState(false);
-			SetDrvData(DrvData.Default, 0);
 		}
 
 		public static void ShowMem(ushort address)
@@ -393,7 +437,10 @@ namespace gbdbg
 				return;
 			}
 
+			SetDbgState(true);
 			byte b = ReadMem(address);
+			SetDbgState(false);
+			SetDrvData(DrvData.Default, 0);
 			Console.WriteLine("0x" + b.ToString("x2"));
 		}
 
@@ -410,7 +457,10 @@ namespace gbdbg
 				Console.WriteLine("Write mem failed: Not halted!");
 				return;
 			}
+			SetDbgState(true);
 			WriteMem(address, val);
+			SetDbgState(false);
+			SetDrvData(DrvData.Default, 0);
 		}
 
 		private static string portfile;
