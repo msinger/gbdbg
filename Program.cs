@@ -37,18 +37,12 @@ namespace gbdbg
 		public static void Send(byte[] buf)
 		{
 			byte[] rbuf = new byte[1];
+		repeat:
 			for (int i = 0; i < buf.Length; i++)
 			{
-				bool ok = false;
-				while (!ok)
-				{
-					ok = true;
-					p.Write(buf, i, 1);
-					try { if (p.Read(rbuf, 0, 1) != 1) ok = false; }
-					catch (TimeoutException) { ok = false; }
-					if (!ok)
-						OpenPort();
-				}
+				p.Write(buf, i, 1);
+				try { if (p.Read(rbuf, 0, 1) != 1) goto repeat; }
+				catch (TimeoutException) { goto repeat; }
 				int k = rbuf[0] >> 4;
 				ret[k] = (byte)(0x80 | (rbuf[0] & 0xf));
 			}
