@@ -36,7 +36,15 @@ namespace gbdbg
 						debugger.Step();
 						break;
 					case "r":
-						Console.WriteLine(debugger.Registers);
+						{
+							Lr35902Registers regs = debugger.Registers;
+							Console.WriteLine(regs);
+							System.IO.Stream mem = debugger.OpenMemory(regs.PC);
+							Lr35902Disassembler dis = new Lr35902Disassembler(mem);
+							Console.WriteLine("->" + mem.Position.ToString("x4") + ": " + dis.ReadLine());
+							Console.WriteLine("  " + mem.Position.ToString("x4") + ": " + dis.ReadLine());
+							Console.WriteLine("  " + mem.Position.ToString("x4") + ": " + dis.ReadLine());
+						}
 						break;
 					case "b":
 						if (a.Length != 3)

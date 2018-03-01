@@ -6,7 +6,7 @@ namespace gbdbg
 	using Regs = Lr35902Registers;
 	using F = Lr35902StatusFlags;
 
-	public class Lr35902Debugger
+	public partial class Lr35902Debugger
 	{
 		[Serializable]
 		[Flags]
@@ -381,6 +381,18 @@ namespace gbdbg
 		{
 			this.port = port;
 			OpenPort();
+		}
+
+		public System.IO.Stream OpenMemory()
+		{
+			return new TargetMemoryStream(this);
+		}
+
+		public System.IO.Stream OpenMemory(ushort address)
+		{
+			TargetMemoryStream stm = new TargetMemoryStream(this);
+			stm.Position = address;
+			return stm;
 		}
 	}
 }

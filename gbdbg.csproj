@@ -40,6 +40,8 @@
     <Compile Include="Lr35902Registers.cs" />
     <Compile Include="NotHaltedException.cs" />
     <Compile Include="InvalidResponseException.cs" />
+    <Compile Include="Lr35902Disassembler.cs" />
+    <Compile Include="Lr35902Debugger.TargetMemoryStream.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>
