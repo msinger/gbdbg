@@ -73,7 +73,13 @@ namespace gbdbg
 
 		private State ReadState(Nibbles mask)
 		{
+			//Console.Write("B:");
+			//for (int i = 0; i < 16; i++) Console.Write(" " + ret[i].ToString("x2"));
+			//Console.WriteLine();
 			byte[] buf = ReceiveRet(mask);
+			//Console.Write("A:");
+			//for (int i = 0; i < 16; i++) Console.Write(" " + ret[i].ToString("x2"));
+			//Console.WriteLine();
 			State s;
 			s.NoInc = (buf[0] & 2) != 0;
 			s.Halt  = (buf[0] & 1) != 0;
