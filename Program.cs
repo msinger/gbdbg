@@ -135,6 +135,46 @@ namespace gbdbg
 							debugger.WriteMem((ushort)address, (byte)val);
 						}
 						break;
+					case "x":
+						if (a.Length > 4 || a.Length < 2)
+						{
+							Console.WriteLine("Execute instruction");
+							Console.WriteLine("Usage: x <hex0> [<hex1> [<hex2>]]");
+							break;
+						}
+						{
+							byte[] op;
+							int hex0, hex1, hex2;
+							if (!int.TryParse(a[1], NumberStyles.HexNumber, NumberFormatInfo.InvariantInfo, out hex0) ||
+								hex0 < 0 || hex0 > 0xff)
+							{
+								Console.WriteLine("Invalid instruction");
+								break;
+							}
+							op = new byte[] { (byte)hex0 };
+							if (a.Length > 2)
+							{
+								if (!int.TryParse(a[2], NumberStyles.HexNumber, NumberFormatInfo.InvariantInfo, out hex1) ||
+									hex1 < 0 || hex1 > 0xff)
+								{
+									Console.WriteLine("Invalid instruction");
+									break;
+								}
+								op = new byte[] { (byte)hex0, (byte)hex1 };
+								if (a.Length > 3)
+								{
+									if (!int.TryParse(a[3], NumberStyles.HexNumber, NumberFormatInfo.InvariantInfo, out hex2) ||
+										hex2 < 0 || hex2 > 0xff)
+									{
+										Console.WriteLine("Invalid instruction");
+										break;
+									}
+									op = new byte[] { (byte)hex0, (byte)hex1, (byte)hex2 };
+								}
+							}
+							debugger.Execute(op);
+						}
+						break;
 					default:
 						Console.WriteLine("Invalid command!");
 						break;
