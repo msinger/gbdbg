@@ -227,13 +227,13 @@ namespace gbdbg
 				case 0x20: case 0x30: case 0x28: case 0x38:
 					imm0 = br.ReadByte();
 					if (comment_rel)
-						return string.Format("{0:x2} {1:x2}     JR {2}, {1}   # =${3:x4}", instr, (sbyte)imm0, cond, pc + 2 + (sbyte)imm0);
+						return string.Format("{0:x2} {1:x2}     JR {2}, {1}   ; ${3:x4}", instr, (sbyte)imm0, cond, pc + 2 + (sbyte)imm0);
 					return string.Format("{0:x2} {1:x2}     JR {2}, {1}", instr, (sbyte)imm0, cond);
 
 				case 0x18:
 					imm0 = br.ReadByte();
 					if (comment_rel)
-						return string.Format("{0:x2} {1:x2}     JR {1}   # =${2:x4}", instr, (sbyte)imm0, pc + 2 + (sbyte)imm0);
+						return string.Format("{0:x2} {1:x2}     JR {1}   ; ${2:x4}", instr, (sbyte)imm0, pc + 2 + (sbyte)imm0);
 					return string.Format("{0:x2} {1:x2}     JR {1}", instr, (sbyte)imm0);
 
 				case 0xc2: case 0xd2: case 0xca: case 0xda:
