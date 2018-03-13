@@ -34,7 +34,7 @@ namespace gbdbg
 		{
 			public bool Drive;
 			public byte Data;
-			public static readonly DriveData[] Default = new DriveData[24];
+			public static readonly DriveData[] Default = new DriveData[4];
 		}
 
 		private string port;
@@ -151,20 +151,13 @@ namespace gbdbg
 			}
 		}
 
-		private void SetDriveData(DriveData[] data, int offset, int len)
+		private void SetDriveData(DriveData[] data)
 		{
-			int prevd = -1;
-			for (int i = 0; i < len; i++)
+			for (int i = 0; i < 4; i++)
 			{
 				if (data[i].Drive)
-				{
-					if (prevd != data[i].Data)
-					{
-						prevd = data[i].Data;
-						Send(new byte[] { (byte)(0x10 | (prevd & 0xf)), (byte)(0x10 | (prevd >> 4)) });
-					}
-				}
-				Send(new byte[] { (byte)((data[i].Drive ? 0x60 : 0x40) | (i + offset)) });
+					Send(new byte[] { (byte)(0x10 | (data[i].Data & 0xf)), (byte)(0x10 | (data[i].Data >> 4)) });
+				Send(new byte[] { (byte)((data[i].Drive ? 0x60 : 0x40) | i) });
 			}
 		}
 
@@ -173,20 +166,18 @@ namespace gbdbg
 			if (op.Length > 3) throw new ArgumentException("Max len is 3", "op");
 			CheckHalted();
 			bool prev_noinc = NoIncrement;
-			int i, j;
-			DriveData[] d = new DriveData[24];
-			for (i = 0, j = 2; i < op.Length; i++, j += 4)
+			int i;
+			DriveData[] d = new DriveData[4];
+			for (i = 0; i < op.Length; i++)
 			{
-				d[j].Drive = true;
-				d[j + 1].Drive = true;
-				d[j].Data = op[i];
-				d[j + 1].Data = op[i];
+				d[i].Drive = true;
+				d[i].Data = op[i];
 			}
-			SetDriveData(d, 0, op.Length * 4);
+			SetDriveData(d);
 			NoIncrement = true;
 			Step();
 			NoIncrement = prev_noinc;
-			SetDriveData(DriveData.Default, 0, op.Length * 4);
+			SetDriveData(DriveData.Default);
 		}
 
 		public Regs Registers
