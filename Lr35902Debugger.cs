@@ -391,5 +391,11 @@ namespace gbdbg
 			stm.Position = address;
 			return stm;
 		}
+
+		public void RawSend(System.IO.Stream data)
+		{
+			data.CopyTo(p.BaseStream);
+			p.BaseStream.Flush();
+		}
 	}
 }

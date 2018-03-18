@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Globalization;
 
 namespace gbdbg
@@ -173,6 +174,34 @@ namespace gbdbg
 								}
 							}
 							debugger.Execute(op);
+						}
+						break;
+					case "loadrom":
+						if (a.Length < 2)
+						{
+							Console.WriteLine("Load file into ROM while device is under reset");
+							Console.WriteLine("Usage: loadrom <path>");
+							break;
+						}
+						{
+							string path = cmd.TrimStart().Substring(8);
+							MemoryStream m = null;
+							try
+							{
+								using (FileStream f = new FileStream(path, FileMode.Open, FileAccess.Read))
+								{
+									m = new MemoryStream();
+									f.CopyTo(m);
+								}
+							}
+							catch
+							{
+								Console.WriteLine("Failed to read file \"" + path + "\"");
+								break;
+							}
+							Console.WriteLine("Sending file \"" + path + "\"...");
+							m.Seek(0, SeekOrigin.Begin);
+							debugger.RawSend(m);
 						}
 						break;
 					default:
