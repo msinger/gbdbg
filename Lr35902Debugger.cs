@@ -25,7 +25,7 @@ namespace gbdbg
 		private struct State
 		{
 			public F F;
-			public bool NoInc, Halt;
+			public bool NoInc, Halt, IME;
 			public byte Arg;
 			public ushort PC, SP;
 		}
@@ -81,6 +81,7 @@ namespace gbdbg
 			//for (int i = 0; i < 16; i++) Console.Write(" " + ret[i].ToString("x2"));
 			//Console.WriteLine();
 			State s;
+			s.IME   = (buf[0] & 8) != 0;
 			s.NoInc = (buf[0] & 2) != 0;
 			s.Halt  = (buf[0] & 1) != 0;
 			s.F     = (F)(buf[0] & 0xf0);
@@ -185,12 +186,13 @@ namespace gbdbg
 			get
 			{
 				CheckHalted();
-				State s = ReadState(Nibbles.Cpu);
+				State s = ReadState(Nibbles.All);
 
 				Regs r;
 				r.PC = s.PC;
 				r.SP = s.SP;
 				r.F = s.F;
+				r.IME = s.IME;
 
 				bool prev_noinc = NoIncrement;
 				NoIncrement = true;

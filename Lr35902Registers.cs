@@ -16,6 +16,7 @@ namespace gbdbg
 		public byte L;
 		public byte A;
 		public F F;
+		public bool IME;
 
 		public ushort BC
 		{
@@ -49,7 +50,7 @@ namespace gbdbg
 			string c = ((F & F.C) != 0) ? "C" : "-";
 
 			return
-				"PC: 0x" + PC.ToString("x4") + "   SP: 0x" + SP.ToString("x4") + "\n" +
+				"PC: 0x" + PC.ToString("x4") + "   SP: 0x" + SP.ToString("x4") + "   IME: " + (IME ? "1" : "0") + "\n" +
 				"B: 0x" + B.ToString("x2") + "   C: 0x" + C.ToString("x2") + "   BC: 0x" + BC.ToString("x4") + "\n" +
 				"D: 0x" + D.ToString("x2") + "   E: 0x" + E.ToString("x2") + "   DE: 0x" + DE.ToString("x4") + "\n" +
 				"H: 0x" + H.ToString("x2") + "   L: 0x" + L.ToString("x2") + "   HL: 0x" + HL.ToString("x4") + "\n" +
