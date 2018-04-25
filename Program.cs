@@ -204,6 +204,96 @@ namespace gbdbg
 							debugger.RawSend(m);
 						}
 						break;
+					case "dump":
+						if (a.Length != 2 && a.Length != 3)
+						{
+							Console.WriteLine("Dump memory");
+							Console.WriteLine("Usage: dump <address> [<length>]");
+							break;
+						}
+						{
+							int address, len = 256;
+							if (!int.TryParse(a[1], NumberStyles.HexNumber, NumberFormatInfo.InvariantInfo, out address) ||
+							    address < 0 || address > 0xffff)
+							{
+								Console.WriteLine("Invalid address");
+								break;
+							}
+							if (a.Length > 2)
+							{
+								if (!int.TryParse(a[2], NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite, NumberFormatInfo.InvariantInfo, out len) ||
+								    len < 0 || len > (0x10000 - address))
+								{
+									Console.WriteLine("Length out of range");
+									break;
+								}
+							}
+							int[] b = new int[16];
+							System.IO.Stream mem = debugger.OpenMemory((ushort)address);
+							while (len >= 0)
+							{
+								Console.Write(mem.Position.ToString("x4") + ": ");
+								for (int i = 0; i < 16; i++)
+								{
+									if (i == 8)
+										Console.Write(" ");
+									b[i] = (i < len) ? mem.ReadByte() : -1;
+									if (b[i] >= 0)
+										Console.Write(" " + b[i].ToString("x2"));
+									else
+										Console.Write("   ");
+								}
+								Console.Write("  |");
+								for (int i = 0; i < 16; i++)
+								{
+									if (b[i] < 0)
+									{
+										len = 0;
+										break;
+									}
+									if (b[i] >= 32 && b[i] < 127)
+										Console.Write((char)b[i]);
+									else
+										Console.Write(".");
+								}
+								Console.WriteLine("|");
+								len -= 16;
+							}
+						}
+						break;
+					case "dis":
+						if (a.Length != 2 && a.Length != 3)
+						{
+							Console.WriteLine("Disassemble memory");
+							Console.WriteLine("Usage: dis <address> [<length>]");
+							break;
+						}
+						{
+							int address, len = 8;
+							if (!int.TryParse(a[1], NumberStyles.HexNumber, NumberFormatInfo.InvariantInfo, out address) ||
+							    address < 0 || address > 0xffff)
+							{
+								Console.WriteLine("Invalid address");
+								break;
+							}
+							if (a.Length > 2)
+							{
+								if (!int.TryParse(a[2], NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite, NumberFormatInfo.InvariantInfo, out len) ||
+								    len < 0 || len > (0x10000 - address))
+								{
+									Console.WriteLine("Length out of range");
+									break;
+								}
+							}
+							System.IO.Stream mem = debugger.OpenMemory((ushort)address);
+							Lr35902Disassembler dis = new Lr35902Disassembler(mem);
+							long start = mem.Position;
+							while (mem.Position < 0xffff && mem.Position - start < len)
+							{
+								Console.WriteLine("  " + mem.Position.ToString("x4") + ": " + dis.ReadLine());
+							}
+						}
+						break;
 					default:
 						Console.WriteLine("Invalid command!");
 						break;
