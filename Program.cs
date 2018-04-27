@@ -307,6 +307,10 @@ namespace gbdbg
 				{
 					Console.WriteLine("Invalid response from target!");
 				}
+				catch (EndOfStreamException)
+				{
+					Console.WriteLine("End of stream!");
+				}
 			}
 		}
 	}
