@@ -6,8 +6,10 @@
 [Bb]in/
 packages/
 TestResults/
+/gbdbg/gbdbg
 
 # globs
+Makefile
 Makefile.in
 *.DS_Store
 *.sln.cache
@@ -19,6 +21,8 @@ Makefile.in
 config.log
 config.make
 config.status
+config.sub
+config.guess
 aclocal.m4
 install-sh
 autom4te.cache/
@@ -28,6 +32,11 @@ tarballs/
 test-results/
 Thumbs.db
 .vs/
+autoscan.log
+configure.scan
+missing
+configure
+AssemblyInfo.cs
 
 #Mac bundle stuff
 *.dmg
