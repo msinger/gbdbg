@@ -3,7 +3,7 @@ AC_INIT(gbdbg, 1.0)
 AC_CONFIG_SRCDIR([gbdbg/Program.cs])
 AC_CONFIG_MACRO_DIR([m4])
 
-AM_INIT_AUTOMAKE([foreign dist-bzip2 filename-length-max=99 no-dependencies std-options tar-ustar])
+AM_INIT_AUTOMAKE([foreign dist-bzip2 filename-length-max=99 no-dependencies tar-ustar])
 AM_MAINTAINER_MODE
 
 MY_CHECK_WS
