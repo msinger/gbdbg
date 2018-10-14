@@ -294,6 +294,9 @@ namespace gbdbg
 							}
 						}
 						break;
+					case "reset":
+						debugger.ResetTarget(a.Length >= 2 && a[1] == "hold");
+						break;
 					default:
 						Console.WriteLine("Invalid command!");
 						break;

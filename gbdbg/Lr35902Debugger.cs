@@ -365,6 +365,7 @@ namespace gbdbg
 
 			p = new SerialPort(port, 1000000, Parity.None, 8, StopBits.One);
 			p.Handshake = Handshake.RequestToSend;
+			p.DtrEnable = false;
 			p.ReadBufferSize  = 16;
 			p.WriteBufferSize = 16;
 			p.WriteTimeout = SerialPort.InfiniteTimeout;
@@ -396,8 +397,26 @@ namespace gbdbg
 
 		public void RawSend(System.IO.Stream data)
 		{
+			ResetTarget(true);
+			System.Threading.Thread.Sleep(100);
 			data.CopyTo(p.BaseStream);
 			p.BaseStream.Flush();
+			System.Threading.Thread.Sleep(100);
+			ResetTarget();
+		}
+
+		public void ResetTarget(bool hold)
+		{
+			p.DtrEnable = true;
+			System.Threading.Thread.Sleep(100);
+			if (hold) return;
+			p.DtrEnable = false;
+			System.Threading.Thread.Sleep(100);
+		}
+
+		public void ResetTarget()
+		{
+			ResetTarget(false);
 		}
 	}
 }
