@@ -3,9 +3,9 @@
 namespace gbdbg
 {
 	[Serializable]
-	public class InvalidResponseException : ApplicationException
+	public class InvalidResponseException : Exception
 	{
-		public InvalidResponseException() : base("Invalid response")
+		public InvalidResponseException() : base("Invalid target response.")
 		{
 		}
 

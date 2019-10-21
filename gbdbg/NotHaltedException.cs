@@ -3,9 +3,9 @@
 namespace gbdbg
 {
 	[Serializable]
-	public class NotHaltedException : ApplicationException
+	public class NotHaltedException : Exception
 	{
-		public NotHaltedException() : base("Not halted")
+		public NotHaltedException() : base("Target not halted.")
 		{
 		}
 

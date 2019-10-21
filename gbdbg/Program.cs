@@ -136,11 +136,11 @@ namespace gbdbg
 							debugger.WriteMem((ushort)address, (byte)val);
 						}
 						break;
-					case "x":
+					case "xx":
 						if (a.Length > 4 || a.Length < 2)
 						{
 							Console.WriteLine("Execute instruction");
-							Console.WriteLine("Usage: x <hex0> [<hex1> [<hex2>]]");
+							Console.WriteLine("Usage: xx <hex0> [<hex1> [<hex2>]]");
 							break;
 						}
 						{
@@ -174,6 +174,47 @@ namespace gbdbg
 								}
 							}
 							debugger.Execute(op);
+						}
+						break;
+					case "x":
+						if (a.Length < 2)
+						{
+							Console.WriteLine("Assemble and execute instruction");
+							Console.WriteLine("Usage: x <asm>");
+							break;
+						}
+						{
+							string asmline = cmd.TrimStart().Substring(2);
+							MemoryStream m = new MemoryStream();
+							Lr35902Assembler asm = new Lr35902Assembler(m);
+							try
+							{
+								asm.WriteLine(asmline);
+							}
+							catch(AsmFormatException e)
+							{
+								Console.WriteLine(e.Message);
+								Console.WriteLine("> " + asmline);
+								for (int i = 0; i < e.Column; i++)
+									Console.Write(" ");
+								Console.WriteLine(" ^");
+								break;
+							}
+							catch
+							{
+								Console.WriteLine("Failed to assemble line");
+								break;
+							}
+							m.Position = 0;
+							while (true)
+							{
+								int b = m.ReadByte();
+								if (b == -1)
+									break;
+								Console.Write(b.ToString("X2") + " ");
+							}
+							Console.WriteLine();
+							debugger.Execute(m.ToArray());
 						}
 						break;
 					case "loadrom":

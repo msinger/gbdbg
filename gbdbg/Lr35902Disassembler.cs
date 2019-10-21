@@ -5,14 +5,14 @@ namespace gbdbg
 {
 	public class Lr35902Disassembler
 	{
-		private BinaryReader br;
+		private readonly BinaryReader br;
 
 		public Lr35902Disassembler(Stream input)
 		{
 			br = new BinaryReader(input);
 		}
 
-		private string GetRegName(int num)
+		private static string GetRegName(int num)
 		{
 			switch (num)
 			{
@@ -28,7 +28,7 @@ namespace gbdbg
 			}
 		}
 
-		private string GetOpName(int num)
+		private static string GetOpName(int num)
 		{
 			switch (num)
 			{
@@ -44,7 +44,7 @@ namespace gbdbg
 			}
 		}
 
-		private string GetCbName(int num)
+		private static string GetCbName(int num)
 		{
 			switch (num)
 			{
@@ -60,7 +60,7 @@ namespace gbdbg
 			}
 		}
 
-		private string GetR16Name(int num)
+		private static string GetR16Name(int num)
 		{
 			switch (num)
 			{
@@ -72,7 +72,7 @@ namespace gbdbg
 			}
 		}
 
-		private string GetR16PPName(int num)
+		private static string GetR16PPName(int num)
 		{
 			switch (num)
 			{
@@ -84,7 +84,7 @@ namespace gbdbg
 			}
 		}
 
-		private string GetR16IndName(int num)
+		private static string GetR16IndName(int num)
 		{
 			switch (num)
 			{
