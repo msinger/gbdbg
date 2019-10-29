@@ -120,6 +120,12 @@ namespace gbdbg
 			ClearRet(Nibbles.All);
 		}
 
+		public void Unlock()
+		{
+			Send(new byte[] { 0x01, 0x1a, 0x18, 0x41 });
+			ClearRet(Nibbles.All);
+		}
+
 		public bool IsHalted
 		{
 			get { return ReadState(Nibbles.State).Halt; }

@@ -13,6 +13,8 @@ namespace gbdbg
 
 			Lr35902Debugger debugger = new Lr35902Debugger(args[0]);
 
+			debugger.Unlock();
+
 			while (true)
 			{
 				Console.Write("gbdbg# ");
