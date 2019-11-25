@@ -58,13 +58,13 @@ namespace gbdbg
 						}
 						{
 							int index, address;
-							if (!int.TryParse(a[1], NumberStyles.Integer, NumberFormatInfo.InvariantInfo, out index) ||
+							if (!NumberParser.TryParse(a[1], out index) ||
 								index < 0 || index >= 8)
 							{
 								Console.WriteLine("Invalid breakpoint index");
 								break;
 							}
-							if (!int.TryParse(a[2], NumberStyles.HexNumber, NumberFormatInfo.InvariantInfo, out address) ||
+							if (!NumberParser.TryParse(a[2], out address) ||
 								address < 0 || address > 0xffff)
 							{
 								Console.WriteLine("Invalid breakpoint address");
@@ -82,7 +82,7 @@ namespace gbdbg
 						}
 						{
 							int val;
-							if (!int.TryParse(a[2], NumberStyles.HexNumber, NumberFormatInfo.InvariantInfo, out val) ||
+							if (!NumberParser.TryParse(a[2], out val) ||
 								val < 0 || val > 0xffff || (a[1].Length == 1 && val > 0xff))
 							{
 								Console.WriteLine("Invalid value");
@@ -104,7 +104,7 @@ namespace gbdbg
 						}
 						{
 							int address;
-							if (!int.TryParse(a[1], NumberStyles.HexNumber, NumberFormatInfo.InvariantInfo, out address) ||
+							if (!NumberParser.TryParse(a[1], out address) ||
 								address < 0 || address > 0xffff)
 							{
 								Console.WriteLine("Invalid address");
@@ -123,13 +123,13 @@ namespace gbdbg
 						}
 						{
 							int address, val;
-							if (!int.TryParse(a[1], NumberStyles.HexNumber, NumberFormatInfo.InvariantInfo, out address) ||
+							if (!NumberParser.TryParse(a[1], out address) ||
 								address < 0 || address > 0xffff)
 							{
 								Console.WriteLine("Invalid address");
 								break;
 							}
-							if (!int.TryParse(a[2], NumberStyles.HexNumber, NumberFormatInfo.InvariantInfo, out val) ||
+							if (!NumberParser.TryParse(a[2], out val) ||
 								val < 0 || val > 0xff)
 							{
 								Console.WriteLine("Invalid value");
@@ -256,7 +256,7 @@ namespace gbdbg
 						}
 						{
 							int address, len = 256;
-							if (!int.TryParse(a[1], NumberStyles.HexNumber, NumberFormatInfo.InvariantInfo, out address) ||
+							if (!NumberParser.TryParse(a[1], out address) ||
 							    address < 0 || address > 0xffff)
 							{
 								Console.WriteLine("Invalid address");
@@ -264,7 +264,7 @@ namespace gbdbg
 							}
 							if (a.Length > 2)
 							{
-								if (!int.TryParse(a[2], NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite, NumberFormatInfo.InvariantInfo, out len) ||
+								if (!NumberParser.TryParse(a[2], out len) ||
 								    len < 0 || len > (0x10000 - address))
 								{
 									Console.WriteLine("Length out of range");
@@ -313,7 +313,7 @@ namespace gbdbg
 						}
 						{
 							int address, len = 8;
-							if (!int.TryParse(a[1], NumberStyles.HexNumber, NumberFormatInfo.InvariantInfo, out address) ||
+							if (!NumberParser.TryParse(a[1], out address) ||
 							    address < 0 || address > 0xffff)
 							{
 								Console.WriteLine("Invalid address");
@@ -321,7 +321,7 @@ namespace gbdbg
 							}
 							if (a.Length > 2)
 							{
-								if (!int.TryParse(a[2], NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite, NumberFormatInfo.InvariantInfo, out len) ||
+								if (!NumberParser.TryParse(a[2], out len) ||
 								    len < 0 || len > (0x10000 - address))
 								{
 									Console.WriteLine("Length out of range");

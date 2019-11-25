@@ -16,8 +16,6 @@ FILES = \
 	Lr35902Assembler.Indirection.cs \
 	Lr35902Assembler.Instruction.cs \
 	Lr35902Assembler.Label.cs \
-	Lr35902Assembler.LexerToken.cs \
-	Lr35902Assembler.LexerTokenType.cs \
 	Lr35902Assembler.Negation.cs \
 	Lr35902Assembler.OriginDirective.cs \
 	Lr35902Assembler.ParserToken.cs \
@@ -28,9 +26,13 @@ FILES = \
 	Lr35902Debugger.cs \
 	Lr35902Debugger.TargetMemoryStream.cs \
 	Lr35902Disassembler.cs \
+	Lr35902LexerBase.cs \
+	Lr35902LexerBase.LexerToken.cs \
+	Lr35902LexerBase.LexerTokenType.cs \
 	Lr35902Registers.cs \
 	Lr35902StatusFlags.cs \
 	NotHaltedException.cs \
+	NumberParser.cs \
 	Program.cs \
 	Properties/AssemblyInfo.cs
 

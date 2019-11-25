@@ -1,6 +1,6 @@
 namespace gbdbg
 {
-	public partial class Lr35902Assembler
+	public abstract partial class Lr35902LexerBase
 	{
 		[System.Serializable]
 		protected enum LexerTokenType
