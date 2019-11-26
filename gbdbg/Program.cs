@@ -136,8 +136,7 @@ namespace gbdbg
 								Console.WriteLine("Invalid value");
 								break;
 							}
-							for (int address = range.Start; address <= range.End; address++)
-								debugger.WriteMem((ushort)address, (byte)val);
+							debugger.WriteMemRange((ushort)range.Start, (ushort)range.Length, (byte)val);
 						}
 						break;
 					case "xx":

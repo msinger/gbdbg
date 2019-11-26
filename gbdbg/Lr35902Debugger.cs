@@ -327,6 +327,14 @@ namespace gbdbg
 			Execute(op);
 		}
 
+		private byte ReadMemInternal(ushort address)
+		{
+			Execute(new byte[] { 0xfa, (byte)address, (byte)(address >> 8) }); // LD A, (a16)
+			Execute(new byte[] { 0x7f }); // LD A, A
+			byte m = ReadState(Nibbles.Arg).Arg;
+			return m;
+		}
+
 		public byte ReadMem(ushort address)
 		{
 			CheckHalted();
@@ -336,9 +344,7 @@ namespace gbdbg
 
 			Execute(new byte[] { 0x7f }); // LD A, A
 			byte a = ReadState(Nibbles.Arg).Arg;
-			Execute(new byte[] { 0xfa, (byte)address, (byte)(address >> 8) }); // LD A, (a16)
-			Execute(new byte[] { 0x7f }); // LD A, A
-			byte m = ReadState(Nibbles.Arg).Arg;
+			byte m = ReadMemInternal(address);
 			Execute(new byte[] { 0x3e, a }); // LD A, d8
 
 			NoIncrement = prev_noinc;
@@ -346,7 +352,18 @@ namespace gbdbg
 			return m;
 		}
 
+		private void WriteMemInternal(ushort address, byte val)
+		{
+			Execute(new byte[] { 0x3e, val }); // LD A, d8
+			Execute(new byte[] { 0xea, (byte)address, (byte)(address >> 8) }); // LD (a16), A
+		}
+
 		public void WriteMem(ushort address, byte val)
+		{
+			WriteMemRange(address, 1, val);
+		}
+
+		public void WriteMemRange(ushort address, ushort len, byte val)
 		{
 			CheckHalted();
 
@@ -355,8 +372,8 @@ namespace gbdbg
 
 			Execute(new byte[] { 0x7f }); // LD A, A
 			byte a = ReadState(Nibbles.Arg).Arg;
-			Execute(new byte[] { 0x3e, val }); // LD A, d8
-			Execute(new byte[] { 0xea, (byte)address, (byte)(address >> 8) }); // LD (a16), A
+			for (ushort cur = address; cur < address + len; cur++)
+				WriteMemInternal(cur, val);
 			Execute(new byte[] { 0x3e, a }); // LD A, d8
 
 			NoIncrement = prev_noinc;
