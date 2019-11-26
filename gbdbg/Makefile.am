@@ -34,7 +34,8 @@ FILES = \
 	NotHaltedException.cs \
 	NumberParser.cs \
 	Program.cs \
-	Properties/AssemblyInfo.cs
+	Properties/AssemblyInfo.cs \
+	Range.cs
 
 DATA_FILES =
 

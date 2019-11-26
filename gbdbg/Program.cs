@@ -248,31 +248,23 @@ namespace gbdbg
 						}
 						break;
 					case "dump":
-						if (a.Length != 2 && a.Length != 3)
+						if (a.Length != 2)
 						{
 							Console.WriteLine("Dump memory");
-							Console.WriteLine("Usage: dump <address> [<length>]");
+							Console.WriteLine("Usage: dump <address>[+<length>]");
+							Console.WriteLine("   or: dump <first>[-<last>]");
 							break;
 						}
 						{
-							int address, len = 256;
-							if (!NumberParser.TryParse(a[1], out address) ||
-							    address < 0 || address > 0xffff)
+							Range range;
+							if (!Range.TryParse(a[1], out range, 256) || !ValidAdrRange(range))
 							{
-								Console.WriteLine("Invalid address");
+								Console.WriteLine("Invalid address range");
 								break;
 							}
-							if (a.Length > 2)
-							{
-								if (!NumberParser.TryParse(a[2], out len) ||
-								    len < 0 || len > (0x10000 - address))
-								{
-									Console.WriteLine("Length out of range");
-									break;
-								}
-							}
 							int[] b = new int[16];
-							System.IO.Stream mem = debugger.OpenMemory((ushort)address);
+							System.IO.Stream mem = debugger.OpenMemory((ushort)range.Start);
+							int len = range.Length;
 							while (len >= 0)
 							{
 								Console.Write(mem.Position.ToString("x4") + ": ");
@@ -305,32 +297,24 @@ namespace gbdbg
 						}
 						break;
 					case "dis":
-						if (a.Length != 2 && a.Length != 3)
+						if (a.Length != 2)
 						{
 							Console.WriteLine("Disassemble memory");
-							Console.WriteLine("Usage: dis <address> [<length>]");
+							Console.WriteLine("Usage: dis <address>[+<length>]");
+							Console.WriteLine("   or: dis <first>[-<last>]");
 							break;
 						}
 						{
-							int address, len = 8;
-							if (!NumberParser.TryParse(a[1], out address) ||
-							    address < 0 || address > 0xffff)
+							Range range;
+							if (!Range.TryParse(a[1], out range, 16) || !ValidAdrRange(range))
 							{
-								Console.WriteLine("Invalid address");
+								Console.WriteLine("Invalid address range");
 								break;
 							}
-							if (a.Length > 2)
-							{
-								if (!NumberParser.TryParse(a[2], out len) ||
-								    len < 0 || len > (0x10000 - address))
-								{
-									Console.WriteLine("Length out of range");
-									break;
-								}
-							}
-							System.IO.Stream mem = debugger.OpenMemory((ushort)address);
+							System.IO.Stream mem = debugger.OpenMemory((ushort)range.Start);
 							Lr35902Disassembler dis = new Lr35902Disassembler(mem);
 							long start = mem.Position;
+							long len = range.Length;
 							while (mem.Position < 0xffff && mem.Position - start < len)
 							{
 								Console.WriteLine("  " + mem.Position.ToString("x4") + ": " + dis.ReadLine());
@@ -358,6 +342,13 @@ namespace gbdbg
 					Console.WriteLine("End of stream!");
 				}
 			}
+		}
+
+		private static bool ValidAdrRange(Range range)
+		{
+			return range != null &&
+			       range.Start >= 0 && range.Start <= 0xffff &&
+			       range.Length >= 0 && range.Length <= (0x10000 - range.Start);
 		}
 	}
 }
