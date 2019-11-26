@@ -129,11 +129,25 @@ namespace gbdbg
 				}
 				else if (bin)
 				{
-					throw new NotImplementedException("Binary numbers not implemented yet.");
+					try
+					{
+						val = Convert.ToInt32(str, 2);
+					}
+					catch (Exception e)
+					{
+						throw new AsmFormatException(value_pos, "Invalid binary number encountered by lexer.", e);
+					}
 				}
 				else if (oct)
 				{
-					throw new NotImplementedException("Octal numbers not implemented yet.");
+					try
+					{
+						val = Convert.ToInt32(str, 8);
+					}
+					catch (Exception e)
+					{
+						throw new AsmFormatException(value_pos, "Invalid octal number encountered by lexer.", e);
+					}
 				}
 				else
 				{
