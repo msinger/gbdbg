@@ -118,24 +118,26 @@ namespace gbdbg
 						if (a.Length != 3)
 						{
 							Console.WriteLine("Write byte");
-							Console.WriteLine("Usage: wr <address> <value>");
+							Console.WriteLine("Usage: wr <address>[+<length>] <value>");
+							Console.WriteLine("   or: wr <first>[-<last>] <value>");
 							break;
 						}
 						{
-							int address, val;
-							if (!NumberParser.TryParse(a[1], out address) ||
-								address < 0 || address > 0xffff)
+							Range range;
+							if (!Range.TryParse(a[1], out range) || !ValidAdrRange(range))
 							{
-								Console.WriteLine("Invalid address");
+								Console.WriteLine("Invalid address range");
 								break;
 							}
+							int val;
 							if (!NumberParser.TryParse(a[2], out val) ||
 								val < 0 || val > 0xff)
 							{
 								Console.WriteLine("Invalid value");
 								break;
 							}
-							debugger.WriteMem((ushort)address, (byte)val);
+							for (int address = range.Start; address <= range.End; address++)
+								debugger.WriteMem((ushort)address, (byte)val);
 						}
 						break;
 					case "xx":
