@@ -244,6 +244,47 @@ namespace gbdbg
 			Send(buf);
 		}
 
+		private ushort SaveA()
+		{
+			CheckHalted();
+
+			bool prev_noinc = NoIncrement;
+			NoIncrement = true;
+
+			Execute(new byte[] { 0x7f }); // LD A, A
+			byte a = ReadState(Nibbles.Arg).Arg;
+
+			return (ushort)((prev_noinc ? 1 : 0) | ((ushort)a << 8));
+		}
+
+		private void RestoreA(ushort prev)
+		{
+			bool prev_noinc = (prev & 1) != 0;
+			byte a = (byte)(prev >> 8);
+
+			Execute(new byte[] { 0x3e, a }); // LD A, d8
+			NoIncrement = prev_noinc;
+		}
+
+		private uint SaveAHL()
+		{
+			ushort a = SaveA();
+			Execute(new byte[] { 0x6d }); // LD L, L
+			byte l = ReadState(Nibbles.Arg).Arg;
+			Execute(new byte[] { 0x64 }); // LD H, H
+			byte h = ReadState(Nibbles.Arg).Arg;
+			return (uint)(a | ((uint)l << 16) | ((uint)h << 24));
+		}
+
+		private void RestoreAHL(uint prev)
+		{
+			ushort a = (ushort)(prev & 0xffff);
+			byte l = (byte)((prev >> 16) & 0xff);
+			byte h = (byte)(prev >> 24);
+			Execute(new byte[] { 0x21, l, h }); // LD HL, d16
+			RestoreA(a);
+		}
+
 		private void SetAF(ushort af, bool restore_a)
 		{
 			CheckHalted();
@@ -327,56 +368,78 @@ namespace gbdbg
 			Execute(op);
 		}
 
-		private byte ReadMemInternal(ushort address)
+		public byte ReadMem(ushort address)
 		{
+			ushort prev = SaveA();
 			Execute(new byte[] { 0xfa, (byte)address, (byte)(address >> 8) }); // LD A, (a16)
 			Execute(new byte[] { 0x7f }); // LD A, A
 			byte m = ReadState(Nibbles.Arg).Arg;
+			RestoreA(prev);
 			return m;
 		}
 
-		public byte ReadMem(ushort address)
+		public void ReadMemRange(byte[] data, int index, ushort address, int len)
 		{
-			CheckHalted();
-
-			bool prev_noinc = NoIncrement;
-			NoIncrement = true;
-
-			Execute(new byte[] { 0x7f }); // LD A, A
-			byte a = ReadState(Nibbles.Arg).Arg;
-			byte m = ReadMemInternal(address);
-			Execute(new byte[] { 0x3e, a }); // LD A, d8
-
-			NoIncrement = prev_noinc;
-
-			return m;
+			if (data.Length < index + len)
+				throw new ArgumentOutOfRangeException("index", "data.Length < index + len");
+			uint prev = SaveAHL();
+			Execute(new byte[] { 0x21, (byte)(address & 0xff), (byte)(address >> 8) }); // LD HL, d16
+			for (int i = 0; i < len; i++)
+			{
+				Execute(new byte[] { 0x2a }); // LD A, (HL+)
+				Execute(new byte[] { 0x7f }); // LD A, A
+				data[index++] = ReadState(Nibbles.Arg).Arg;
+			}
+			RestoreAHL(prev);
 		}
 
-		private void WriteMemInternal(ushort address, byte val)
+		public void ReadMemRange(byte[] data, ushort address)
 		{
-			Execute(new byte[] { 0x3e, val }); // LD A, d8
-			Execute(new byte[] { 0xea, (byte)address, (byte)(address >> 8) }); // LD (a16), A
+			ReadMemRange(data, 0, address, data.Length);
+		}
+
+		public byte[] ReadMemRange(ushort address, int len)
+		{
+			byte[] data = new byte[len];
+			ReadMemRange(data, address);
+			return data;
 		}
 
 		public void WriteMem(ushort address, byte val)
 		{
-			WriteMemRange(address, 1, val);
+			ushort prev = SaveA();
+			Execute(new byte[] { 0x3e, val }); // LD A, d8
+			Execute(new byte[] { 0xea, (byte)address, (byte)(address >> 8) }); // LD (a16), A
+			RestoreA(prev);
 		}
 
-		public void WriteMemRange(ushort address, ushort len, byte val)
+		public void WriteMemRange(ushort address, int len, byte val)
 		{
-			CheckHalted();
+			uint prev = SaveAHL();
+			Execute(new byte[] { 0x21, (byte)(address & 0xff), (byte)(address >> 8) }); // LD HL, d16
+			Execute(new byte[] { 0x3e, val }); // LD A, d8
+			for (int i = 0; i < len; i++)
+				Execute(new byte[] { 0x22 }); // LD (HL+), A
+			RestoreAHL(prev);
+		}
 
-			bool prev_noinc = NoIncrement;
-			NoIncrement = true;
+		public void WriteMemRange(byte[] data, int index, ushort address, int len)
+		{
+			if (data.Length < index + len)
+				throw new ArgumentOutOfRangeException("index", "data.Length < index + len");
+			uint prev = SaveAHL();
+			Execute(new byte[] { 0x21, (byte)(address & 0xff), (byte)(address >> 8) }); // LD HL, d16
+			for (int i = 0; i < len; i++)
+			{
+				Execute(new byte[] { 0x3e, data[index++] }); // LD A, d8
+				Execute(new byte[] { 0x22 }); // LD (HL+), A
+			}
+			RestoreAHL(prev);
+		}
 
-			Execute(new byte[] { 0x7f }); // LD A, A
-			byte a = ReadState(Nibbles.Arg).Arg;
-			for (ushort cur = address; cur < address + len; cur++)
-				WriteMemInternal(cur, val);
-			Execute(new byte[] { 0x3e, a }); // LD A, d8
-
-			NoIncrement = prev_noinc;
+		public void WriteMemRange(byte[] data, ushort address)
+		{
+			WriteMemRange(data, 0, address, data.Length);
 		}
 
 		private void OpenPort()

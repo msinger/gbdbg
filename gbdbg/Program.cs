@@ -136,7 +136,7 @@ namespace gbdbg
 								Console.WriteLine("Invalid value");
 								break;
 							}
-							debugger.WriteMemRange((ushort)range.Start, (ushort)range.Length, (byte)val);
+							debugger.WriteMemRange((ushort)range.Start, range.Length, (byte)val);
 						}
 						break;
 					case "xx":

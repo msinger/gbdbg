@@ -63,27 +63,29 @@ namespace gbdbg
 
 			public override void Write(byte[] buffer, int offset, int count)
 			{
-				int n = 0;
-				for (int i = offset; n < count; i++, n++)
-				{
-					if (adr + n >= Length || adr + n < 0)
-						break;
-					dbg.WriteMem((ushort)(adr + n), buffer[i]);
-				}
-				adr += n;
+				if (adr + count > Length)
+					count = (int)(Length - adr);
+				if (count <= 0)
+					return;
+				if (count == 1)
+					dbg.WriteMem((ushort)adr, buffer[offset]);
+				else
+					dbg.WriteMemRange(buffer, offset, (ushort)adr, count);
+				adr += count;
 			}
 
 			public override int Read(byte[] buffer, int offset, int count)
 			{
-				int n = 0;
-				for (int i = offset; n < count; i++, n++)
-				{
-					if (adr + n >= Length || adr + n < 0)
-						break;
-					buffer[i] = dbg.ReadMem((ushort)(adr + n));
-				}
-				adr += n;
-				return n;
+				if (adr + count > Length)
+					count = (int)(Length - adr);
+				if (count <= 0)
+					return 0;
+				if (count == 1)
+					buffer[offset] = dbg.ReadMem((ushort)adr);
+				else
+					dbg.ReadMemRange(buffer, offset, (ushort)adr, count);
+				adr += count;
+				return count;
 			}
 		}
 	}
