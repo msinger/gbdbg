@@ -246,6 +246,7 @@ namespace gbdbg
 							Console.WriteLine("Sending file \"" + path + "\"...");
 							m.Seek(0, SeekOrigin.Begin);
 							debugger.RawSend(m);
+							debugger.Unlock();
 						}
 						break;
 					case "dump":
@@ -323,7 +324,18 @@ namespace gbdbg
 						}
 						break;
 					case "reset":
-						debugger.ResetTarget(a.Length >= 2 && a[1] == "hold");
+						if (a.Length >= 2 && a[1] == "hold")
+						{
+							debugger.ResetTarget(true);
+						}
+						else
+						{
+							debugger.ResetTarget();
+							debugger.Unlock();
+						}
+						break;
+					case "unlock":
+						debugger.Unlock();
 						break;
 					default:
 						Console.WriteLine("Invalid command!");
