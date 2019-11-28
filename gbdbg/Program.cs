@@ -45,6 +45,35 @@ namespace gbdbg
 							}
 						}
 						return last_error;
+					case "run":
+						if (a.Length < 2)
+						{
+							eout.WriteLine("Run debugger script in sub shell");
+							eout.WriteLine("Usage: run <path>");
+							last_error = 2;
+							break;
+						}
+						{
+							string path = cmd.TrimStart().Substring(4);
+							MemoryStream m = null;
+							try
+							{
+								using (FileStream f = new FileStream(path, FileMode.Open, FileAccess.Read))
+								{
+									m = new MemoryStream();
+									f.CopyTo(m);
+								}
+							}
+							catch
+							{
+								eout.WriteLine("Failed to read file \"" + path + "\"");
+								last_error = 4;
+								break;
+							}
+							m.Seek(0, SeekOrigin.Begin);
+							last_error = Shell(new StreamReader(m), sout, eout, false);
+						}
+						break;
 					case "h":
 						debugger.Halt();
 						last_error = 0;
