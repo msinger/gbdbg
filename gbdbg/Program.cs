@@ -450,6 +450,8 @@ namespace gbdbg
 							eout.WriteLine("  dis [<range>]");
 							eout.WriteLine("  drop");
 							eout.WriteLine("  dump [<range>]");
+							eout.WriteLine("  file <path>");
+							eout.WriteLine("  save <path>");
 							last_error = 2;
 							break;
 						}
@@ -464,45 +466,47 @@ namespace gbdbg
 							switch (a[2])
 							{
 							case "asm":
-								MemoryStream m = new MemoryStream();
-								Lr35902Assembler asm = new Lr35902Assembler(m);
-								last_error = 0;
-								while(true)
 								{
-									if (interactive)
-										sout.Write("> ");
-									string asmline = cmdin.ReadLine();
-
-									if (asmline == null || asmline == "end")
+									MemoryStream m = new MemoryStream();
+									Lr35902Assembler asm = new Lr35902Assembler(m);
+									last_error = 0;
+									while(true)
 									{
 										if (interactive)
-											sout.WriteLine();
-										break;
-									}
+											sout.Write("> ");
+										string asmline = cmdin.ReadLine();
 
-									try
-									{
-										asm.WriteLine(asmline);
+										if (asmline == null || asmline == "end")
+										{
+											if (interactive)
+												sout.WriteLine();
+											break;
+										}
+
+										try
+										{
+											asm.WriteLine(asmline);
+										}
+										catch(AsmFormatException e)
+										{
+											eout.WriteLine(e.Message);
+											eout.WriteLine("> " + asmline);
+											for (int i = 0; i < e.Column; i++)
+												eout.Write(" ");
+											eout.WriteLine(" ^");
+											last_error = 3;
+											break;
+										}
+										catch
+										{
+											eout.WriteLine("Failed to assemble line");
+											last_error = 3;
+											break;
+										}
 									}
-									catch(AsmFormatException e)
-									{
-										eout.WriteLine(e.Message);
-										eout.WriteLine("> " + asmline);
-										for (int i = 0; i < e.Column; i++)
-											eout.Write(" ");
-										eout.WriteLine(" ^");
-										last_error = 3;
-										break;
-									}
-									catch
-									{
-										eout.WriteLine("Failed to assemble line");
-										last_error = 3;
-										break;
-									}
+									if (last_error == 0)
+										buffers[buf] = m;
 								}
-								if (last_error == 0)
-									buffers[buf] = m;
 								break;
 							case "dis":
 								if (a.Length != 3 && a.Length != 4)
@@ -569,6 +573,69 @@ namespace gbdbg
 									}
 									mem.Position = range.Start;
 									Dump(mem, range.Length, sout);
+								}
+								break;
+							case "file":
+								if (a.Length != 4)
+								{
+									eout.WriteLine("Load buffer from file");
+									eout.WriteLine("Usage: buf <name> file <path>");
+									last_error = 2;
+									break;
+								}
+								{
+									string path = a[3];
+									MemoryStream m = null;
+									try
+									{
+										using (FileStream f = new FileStream(path, FileMode.Open, FileAccess.Read))
+										{
+											m = new MemoryStream();
+											f.CopyTo(m);
+										}
+									}
+									catch
+									{
+										eout.WriteLine("Failed to read file \"" + path + "\"");
+										last_error = 4;
+										break;
+									}
+									eout.WriteLine(m.Length.ToString() + " bytes read from file \"" + path + "\".");
+									buffers[buf] = m;
+								}
+								break;
+							case "save":
+								if (a.Length != 4)
+								{
+									eout.WriteLine("Save buffer to file");
+									eout.WriteLine("Usage: buf <name> save <path>");
+									last_error = 2;
+									break;
+								}
+								{
+									Stream mem;
+									if (!buffers.TryGetValue(buf, out mem))
+									{
+										eout.WriteLine("Buffer does not exist: " + buf);
+										last_error = 4;
+										break;
+									}
+									mem.Position = 0;
+									string path = a[3];
+									try
+									{
+										using (FileStream f = new FileStream(path, FileMode.Create, FileAccess.Write))
+										{
+											mem.CopyTo(f);
+										}
+									}
+									catch
+									{
+										eout.WriteLine("Failed to write file \"" + path + "\"");
+										last_error = 4;
+										break;
+									}
+									eout.WriteLine(mem.Length.ToString() + " bytes written to file \"" + path + "\".");
 								}
 								break;
 							default:
