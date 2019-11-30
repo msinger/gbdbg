@@ -15,7 +15,7 @@ namespace gbdbg
 			       range.Length >= 0 && range.Length <= (0x10000 - range.Start);
 		}
 
-		private static int Shell(TextReader sin, TextWriter sout, TextWriter eout, bool interactive)
+		private static int Shell(TextReader cmdin, TextReader sin, TextWriter sout, TextWriter eout, bool interactive)
 		{
 			int last_error = 0;
 
@@ -23,10 +23,14 @@ namespace gbdbg
 			{
 				if (interactive)
 					sout.Write("gbdbg# ");
-				string cmd = sin.ReadLine();
+				string cmd = cmdin.ReadLine();
 
 				if (cmd == null)
+				{
+					if (interactive)
+						sout.WriteLine();
 					return last_error;
+				}
 
 				string[] a = cmd.Split(new char[] { ' ', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries);
 				if (a.Length == 0) continue;
@@ -71,7 +75,7 @@ namespace gbdbg
 								break;
 							}
 							m.Seek(0, SeekOrigin.Begin);
-							last_error = Shell(new StreamReader(m), sout, eout, false);
+							last_error = Shell(new StreamReader(m), sin, sout, eout, false);
 						}
 						break;
 					case "h":
@@ -447,14 +451,113 @@ namespace gbdbg
 			}
 		}
 
+		private static void Usage(TextWriter o)
+		{
+			o.WriteLine("Iceboy Game Boy Debugger");
+			o.WriteLine("USAGE: gbdbg [OPTIONS] [--] DEVICE");
+			o.WriteLine("OPTIONS:");
+			o.WriteLine("  --help        Prints this text.");
+			o.WriteLine("  --run FILE    Runs debugger script FILE, then exits.");
+		}
+
 		public static int Main(string[] args)
 		{
 			Console.CancelKeyPress += (object sender, ConsoleCancelEventArgs e) => e.Cancel = true;
 			Console.TreatControlCAsInput = false;
 
-			debugger = new Lr35902Debugger(args[0]);
-			debugger.Unlock();
-			return Shell(Console.In, Console.Out, Console.Error, true);
+			bool isTTY = !Console.IsInputRedirected && !Console.IsOutputRedirected;
+
+			bool parseOpts = true;
+			string dev = null;
+			string run = null;
+
+			for (int i = 0; i < args.Length; i++)
+			{
+				if (args[i][0] == '-' && parseOpts)
+				{
+					switch (args[i])
+					{
+					case "--":
+						parseOpts = false;
+						break;
+					case "--help":
+						Usage(Console.Out);
+						return 0;
+					case "--run":
+						if (i + 1 >= args.Length)
+						{
+							Usage(Console.Error);
+							return 2;
+						}
+						run = args[++i];
+						break;
+					default:
+						Console.Error.WriteLine("Invalid option: " + args[i]);
+						return 2;
+					}
+					continue;
+				}
+
+				if (dev == null)
+				{
+					dev = args[i];
+					continue;
+				}
+
+				Console.Error.WriteLine("Too many arguments: " + args[i]);
+				return 2;
+			}
+
+			if (dev == null)
+			{
+				Usage(Console.Error);
+				return 2;
+			}
+
+			try
+			{
+				debugger = new Lr35902Debugger(args[0]);
+				debugger.Unlock();
+			}
+			catch (InvalidResponseException)
+			{
+				Console.Error.WriteLine("Invalid response from target.");
+				return 7;
+			}
+			catch (EndOfStreamException)
+			{
+				Console.Error.WriteLine("End of stream.");
+				return 8;
+			}
+			catch (IOException)
+			{
+				Console.Error.WriteLine("Failed to open port.");
+				return 8;
+			}
+
+			TextReader cmdin = Console.In;
+
+			if (run != null)
+			{
+				MemoryStream m = null;
+				try
+				{
+					using (FileStream f = new FileStream(run, FileMode.Open, FileAccess.Read))
+					{
+						m = new MemoryStream();
+						f.CopyTo(m);
+					}
+				}
+				catch
+				{
+					Console.Error.WriteLine("Failed to read file \"" + run + "\"");
+					return 4;
+				}
+				m.Seek(0, SeekOrigin.Begin);
+				cmdin = new StreamReader(m);
+			}
+
+			return Shell(cmdin, Console.In, Console.Out, Console.Error, isTTY && cmdin == Console.In);
 		}
 	}
 }
