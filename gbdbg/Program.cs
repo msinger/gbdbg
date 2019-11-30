@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Collections.Generic;
 using System.Globalization;
 
 namespace gbdbg
@@ -15,8 +16,50 @@ namespace gbdbg
 			       range.Length >= 0 && range.Length <= (0x10000 - range.Start);
 		}
 
+		private static bool ValidBufRange(Stream buf, Range range)
+		{
+			return range != null &&
+			       range.Start >= 0 && range.Start <= buf.Length - 1 &&
+			       range.Length >= 0 && range.Length <= (buf.Length - range.Start);
+		}
+
+		private static void Dump(Stream mem, int len, TextWriter sout)
+		{
+			int[] b = new int[16];
+			while (len >= 0)
+			{
+				sout.Write(mem.Position.ToString("x4") + ": ");
+				for (int i = 0; i < 16; i++)
+				{
+					if (i == 8)
+						sout.Write(" ");
+					b[i] = (i < len) ? mem.ReadByte() : -1;
+					if (b[i] >= 0)
+						sout.Write(" " + b[i].ToString("x2"));
+					else
+						sout.Write("   ");
+				}
+				sout.Write("  |");
+				for (int i = 0; i < 16; i++)
+				{
+					if (b[i] < 0)
+					{
+						len = 0;
+						break;
+					}
+					if (b[i] >= 32 && b[i] < 127)
+						sout.Write((char)b[i]);
+					else
+						sout.Write(".");
+				}
+				sout.WriteLine("|");
+				len -= 16;
+			}
+		}
+
 		private static int Shell(TextReader cmdin, TextReader sin, TextWriter sout, TextWriter eout, bool interactive)
 		{
+			IDictionary<string, Stream> buffers = new Dictionary<string, Stream>();
 			int last_error = 0;
 
 			while (true)
@@ -275,6 +318,7 @@ namespace gbdbg
 								for (int i = 0; i < e.Column; i++)
 									eout.Write(" ");
 								eout.WriteLine(" ^");
+								last_error = 3;
 								break;
 							}
 							catch
@@ -348,38 +392,7 @@ namespace gbdbg
 								last_error = 1;
 								break;
 							}
-							int[] b = new int[16];
-							System.IO.Stream mem = debugger.OpenMemory((ushort)range.Start);
-							int len = range.Length;
-							while (len >= 0)
-							{
-								sout.Write(mem.Position.ToString("x4") + ": ");
-								for (int i = 0; i < 16; i++)
-								{
-									if (i == 8)
-										sout.Write(" ");
-									b[i] = (i < len) ? mem.ReadByte() : -1;
-									if (b[i] >= 0)
-										sout.Write(" " + b[i].ToString("x2"));
-									else
-										sout.Write("   ");
-								}
-								sout.Write("  |");
-								for (int i = 0; i < 16; i++)
-								{
-									if (b[i] < 0)
-									{
-										len = 0;
-										break;
-									}
-									if (b[i] >= 32 && b[i] < 127)
-										sout.Write((char)b[i]);
-									else
-										sout.Write(".");
-								}
-								sout.WriteLine("|");
-								len -= 16;
-							}
+							Dump(debugger.OpenMemory((ushort)range.Start), range.Length, sout);
 						}
 						last_error = 0;
 						break;
@@ -404,7 +417,7 @@ namespace gbdbg
 							Lr35902Disassembler dis = new Lr35902Disassembler(mem);
 							long start = mem.Position;
 							long len = range.Length;
-							while (mem.Position < 0xffff && mem.Position - start < len)
+							while (mem.Position <= 0xffff && mem.Position - start < len)
 							{
 								sout.WriteLine("  " + mem.Position.ToString("x4") + ": " + dis.ReadLine());
 							}
@@ -426,6 +439,144 @@ namespace gbdbg
 					case "unlock":
 						debugger.Unlock();
 						last_error = 0;
+						break;
+					case "buf":
+						if (a.Length < 3)
+						{
+							eout.WriteLine("Performs actions on memory buffers");
+							eout.WriteLine("Usage: buf <buffer> <action> [<args>...]");
+							eout.WriteLine("Actions:");
+							eout.WriteLine("  asm");
+							eout.WriteLine("  dis [<range>]");
+							eout.WriteLine("  drop");
+							eout.WriteLine("  dump [<range>]");
+							last_error = 2;
+							break;
+						}
+						{
+							string buf = NameParser.TryParse(a[1]);
+							if (buf == null)
+							{
+								eout.WriteLine("Invalid buffer name!");
+								last_error = 1;
+								break;
+							}
+							switch (a[2])
+							{
+							case "asm":
+								MemoryStream m = new MemoryStream();
+								Lr35902Assembler asm = new Lr35902Assembler(m);
+								last_error = 0;
+								while(true)
+								{
+									if (interactive)
+										sout.Write("> ");
+									string asmline = cmdin.ReadLine();
+
+									if (asmline == null || asmline == "end")
+									{
+										if (interactive)
+											sout.WriteLine();
+										break;
+									}
+
+									try
+									{
+										asm.WriteLine(asmline);
+									}
+									catch(AsmFormatException e)
+									{
+										eout.WriteLine(e.Message);
+										eout.WriteLine("> " + asmline);
+										for (int i = 0; i < e.Column; i++)
+											eout.Write(" ");
+										eout.WriteLine(" ^");
+										last_error = 3;
+										break;
+									}
+									catch
+									{
+										eout.WriteLine("Failed to assemble line");
+										last_error = 3;
+										break;
+									}
+								}
+								if (last_error == 0)
+									buffers[buf] = m;
+								break;
+							case "dis":
+								if (a.Length != 3 && a.Length != 4)
+								{
+									eout.WriteLine("Disassemble buffer");
+									eout.WriteLine("Usage: buf <name> dis");
+									eout.WriteLine("   or: buf <name> dis <address>[+<length>]");
+									eout.WriteLine("   or: buf <name> dis <first>[-<last>]");
+									last_error = 2;
+									break;
+								}
+								{
+									Stream mem;
+									if (!buffers.TryGetValue(buf, out mem))
+									{
+										eout.WriteLine("Buffer does not exist: " + buf);
+										last_error = 4;
+										break;
+									}
+									Range range = new Range(0, (int)mem.Length);
+									if (a.Length > 3 && (!Range.TryParse(a[3], out range, 16) || !ValidBufRange(mem, range)))
+									{
+										eout.WriteLine("Invalid range within buffer");
+										last_error = 1;
+										break;
+									}
+									mem.Position = range.Start;
+									Lr35902Disassembler dis = new Lr35902Disassembler(mem);
+									long start = mem.Position;
+									long len = range.Length;
+									while (mem.Position - start < len)
+									{
+										sout.WriteLine("  " + mem.Position.ToString("x4") + ": " + dis.ReadLine());
+									}
+								}
+								break;
+							case "drop":
+								last_error = buffers.Remove(buf) ? 0 : 1;
+								break;
+							case "dump":
+								if (a.Length != 3 && a.Length != 4)
+								{
+									eout.WriteLine("Dump buffer");
+									eout.WriteLine("Usage: buf <name> dump");
+									eout.WriteLine("   or: buf <name> dump <address>[+<length>]");
+									eout.WriteLine("   or: buf <name> dump <first>[-<last>]");
+									last_error = 2;
+									break;
+								}
+								{
+									Stream mem;
+									if (!buffers.TryGetValue(buf, out mem))
+									{
+										eout.WriteLine("Buffer does not exist: " + buf);
+										last_error = 4;
+										break;
+									}
+									Range range = new Range(0, (int)mem.Length);
+									if (a.Length > 3 && (!Range.TryParse(a[3], out range, 256) || !ValidBufRange(mem, range)))
+									{
+										eout.WriteLine("Invalid range within buffer");
+										last_error = 1;
+										break;
+									}
+									mem.Position = range.Start;
+									Dump(mem, range.Length, sout);
+								}
+								break;
+							default:
+								eout.WriteLine("Invalid buffer action!");
+								last_error = 5;
+								break;
+							}
+						}
 						break;
 					default:
 						eout.WriteLine("Invalid command!");

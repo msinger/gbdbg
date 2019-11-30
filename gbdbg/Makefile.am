@@ -31,6 +31,7 @@ FILES = \
 	Lr35902LexerBase.LexerTokenType.cs \
 	Lr35902Registers.cs \
 	Lr35902StatusFlags.cs \
+	NameParser.cs \
 	NotHaltedException.cs \
 	NumberParser.cs \
 	Program.cs \
