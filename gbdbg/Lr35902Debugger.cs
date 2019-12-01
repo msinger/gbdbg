@@ -109,8 +109,8 @@ namespace gbdbg
 
 		public void Halt()
 		{
-			ClearRet(Nibbles.All);
 			Send(new byte[] { 0x00 });
+			ClearRet(Nibbles.All);
 			if (!IsHalted) throw new InvalidResponseException();
 		}
 
@@ -151,8 +151,8 @@ namespace gbdbg
 			{
 				if (NoIncrement != value)
 				{
-					ClearRet(Nibbles.State);
 					Send(new byte[] { (byte)(value ? 0x22 : 0x20) });
+					ClearRet(Nibbles.State);
 					if (NoIncrement != value) throw new InvalidResponseException();
 				}
 			}
