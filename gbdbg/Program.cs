@@ -76,7 +76,7 @@ namespace gbdbg
 				}
 
 				string[] a = cmd.Split(new char[] { ' ', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-				if (a.Length == 0) continue;
+				if (a.Length == 0 || a[0][0] == '#') continue;
 
 				try
 				{
