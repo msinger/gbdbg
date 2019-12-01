@@ -451,7 +451,9 @@ namespace gbdbg
 							eout.WriteLine("  drop");
 							eout.WriteLine("  dump [<range>]");
 							eout.WriteLine("  file <path>");
+							eout.WriteLine("  mem <range>");
 							eout.WriteLine("  save <path>");
+							eout.WriteLine("  store <destRange> [<bufOffset>]");
 							last_error = 2;
 							break;
 						}
@@ -604,6 +606,34 @@ namespace gbdbg
 									buffers[buf] = m;
 								}
 								break;
+							case "mem":
+								if (a.Length != 4)
+								{
+									eout.WriteLine("Load buffer from target memory");
+									eout.WriteLine("Usage: buf <name> mem <address>+<length>");
+									eout.WriteLine("   or: buf <name> mem <first>-<last>");
+									last_error = 2;
+									break;
+								}
+								{
+									Range range;
+									if (!Range.TryParse(a[3], out range, -1) || !ValidAdrRange(range))
+									{
+										eout.WriteLine("Invalid address range");
+										last_error = 1;
+										break;
+									}
+									System.IO.Stream mem = debugger.OpenMemory((ushort)range.Start);
+									byte[] arr = new byte[range.Length];
+									int n = mem.Read(arr, 0, arr.Length);
+									eout.WriteLine(n.ToString() + " bytes read from target memory.");
+									MemoryStream m = new MemoryStream();
+									m.Write(arr, 0, n);
+									buffers[buf] = m;
+									if (n != range.Length)
+										last_error = 4;
+								}
+								break;
 							case "save":
 								if (a.Length != 4)
 								{
@@ -636,6 +666,54 @@ namespace gbdbg
 										break;
 									}
 									eout.WriteLine(mem.Length.ToString() + " bytes written to file \"" + path + "\".");
+								}
+								break;
+							case "store":
+								if (a.Length != 4 && a.Length != 5)
+								{
+									eout.WriteLine("Write buffer to target memory");
+									eout.WriteLine("Usage: buf <name> store <address>+<length> [<bufOffset>]");
+									eout.WriteLine("   or: buf <name> store <first>-<last> [<bufOffset>]");
+									last_error = 2;
+									break;
+								}
+								{
+									Stream m;
+									if (!buffers.TryGetValue(buf, out m))
+									{
+										eout.WriteLine("Buffer does not exist: " + buf);
+										last_error = 4;
+										break;
+									}
+									Range range;
+									if (!Range.TryParse(a[3], out range, -1) || !ValidAdrRange(range))
+									{
+										eout.WriteLine("Invalid address range");
+										last_error = 1;
+										break;
+									}
+									int offset = 0;
+									if (a.Length > 4 && !NumberParser.TryParse(a[4], out offset) ||
+										offset < 0 || offset >= m.Length)
+									{
+										eout.WriteLine("Invalid buffer offset");
+										last_error = 1;
+										break;
+									}
+									if (range.Length > m.Length + offset)
+									{
+										eout.WriteLine("Range larger than buffer");
+										last_error = 1;
+										break;
+									}
+									byte[] arr = new byte[range.Length];
+									m.Position = offset;
+									int n = m.Read(arr, 0, arr.Length);
+									System.IO.Stream mem = debugger.OpenMemory((ushort)range.Start);
+									mem.Write(arr, 0, n);
+									eout.WriteLine(n.ToString() + " bytes written to target memory.");
+									if (n != range.Length)
+										last_error = 4;
 								}
 								break;
 							default:
