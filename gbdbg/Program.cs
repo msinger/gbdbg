@@ -761,7 +761,7 @@ namespace gbdbg
 			Console.CancelKeyPress += (object sender, ConsoleCancelEventArgs e) => e.Cancel = true;
 			Console.TreatControlCAsInput = false;
 
-			bool isTTY = !Console.IsInputRedirected && !Console.IsOutputRedirected;
+			bool isTTY = !Console.IsInputRedirected;
 
 			bool parseOpts = true;
 			string dev = null;
