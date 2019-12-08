@@ -672,7 +672,7 @@ namespace gbdbg
 								if (a.Length != 4 && a.Length != 5)
 								{
 									eout.WriteLine("Write buffer to target memory");
-									eout.WriteLine("Usage: buf <name> store <address>+<length> [<bufOffset>]");
+									eout.WriteLine("Usage: buf <name> store <address>[+<length>] [<bufOffset>]");
 									eout.WriteLine("   or: buf <name> store <first>-<last> [<bufOffset>]");
 									last_error = 2;
 									break;
@@ -685,13 +685,6 @@ namespace gbdbg
 										last_error = 4;
 										break;
 									}
-									Range range;
-									if (!Range.TryParse(a[3], out range, -1) || !ValidAdrRange(range))
-									{
-										eout.WriteLine("Invalid address range");
-										last_error = 1;
-										break;
-									}
 									int offset = 0;
 									if (a.Length > 4 && !NumberParser.TryParse(a[4], out offset) ||
 										offset < 0 || offset >= m.Length)
@@ -700,7 +693,14 @@ namespace gbdbg
 										last_error = 1;
 										break;
 									}
-									if (range.Length > m.Length + offset)
+									Range range;
+									if (!Range.TryParse(a[3], out range, (int)m.Length - offset) || !ValidAdrRange(range))
+									{
+										eout.WriteLine("Invalid address range");
+										last_error = 1;
+										break;
+									}
+									if (range.Length > m.Length - offset)
 									{
 										eout.WriteLine("Range larger than buffer");
 										last_error = 1;
