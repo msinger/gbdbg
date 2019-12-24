@@ -16,6 +16,7 @@ size=$(echo rd 0x148 | gbdbg $DEV)
 
 no_mbc=
 has_mbc1=
+has_mbc2=
 
 case "$type" in
 0x00|0x08|0x09)
@@ -25,6 +26,10 @@ case "$type" in
 0x01|0x02|0x03)
 	echo Has MBC1
 	has_mbc1=y
+	;;
+0x05|0x06)
+	echo Has MBC2
+	has_mbc2=y
 	;;
 *)
 	echo Unsupported MBC >&2
@@ -50,6 +55,7 @@ echo $blocks Blocks -- $((blocks * 16)) KBytes
 
 if [ $blocks -lt 2 ] ||
    [ -n "$has_mbc1" -a $blocks -gt 128 ] ||
+   [ -n "$has_mbc2" -a $blocks -gt 16 ] ||
    [ -n "$no_mbc" -a $blocks -gt 2 ]; then
 	echo Unknown ROM size >&2
 	exit 1
@@ -60,6 +66,9 @@ if [ -n "$has_mbc1" ]; then
 	echo wr 0x6000 0 | gbdbg $DEV
 	echo wr 0x4000 0 | gbdbg $DEV
 	echo wr 0x2000 0 | gbdbg $DEV
+elif [ -n "$has_mbc2" ]; then
+	echo wr 0x0000 0 | gbdbg $DEV
+	echo wr 0x2100 0 | gbdbg $DEV
 fi
 
 >$1
@@ -70,6 +79,8 @@ for (( i = 0; i < blocks; i++ )); do
 	if [ -n "$has_mbc1" ]; then
 		echo wr 0x4000 $(( (i >> 5) & 3 )) | gbdbg $DEV
 		echo wr 0x2000 $(( i & 0x1f )) | gbdbg $DEV
+	elif [ -n "$has_mbc2" ]; then
+		echo wr 0x2100 $(( i & 0xf )) | gbdbg $DEV
 	fi
 
 	if (( i % 32 == 0 )); then
