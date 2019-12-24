@@ -2,12 +2,9 @@
 
 set -e
 
-DEV=${DEV:-/dev/ttyUSB1}
+exec 3>&1 >&2
 
-if [ -z "$1" ]; then
-	echo Usage: DEV=/dev/ttyUSB1 dump_rom.sh '<file>' >&2
-	exit 2
-fi
+DEV=${DEV:-/dev/ttyUSB1}
 
 echo h | gbdbg $DEV
 
@@ -61,6 +58,15 @@ if [ $blocks -lt 2 ] ||
 	exit 1
 fi
 
+tmpfile=
+function cleanup () {
+	if [ -n "$tmpfile" ]; then
+		rm -f "$tmpfile"
+	fi
+}
+trap cleanup EXIT
+tmpfile=$(mktemp)
+
 if [ -n "$has_mbc1" ]; then
 	echo wr 0x0000 0 | gbdbg $DEV
 	echo wr 0x6000 0 | gbdbg $DEV
@@ -70,8 +76,6 @@ elif [ -n "$has_mbc2" ]; then
 	echo wr 0x0000 0 | gbdbg $DEV
 	echo wr 0x2100 0 | gbdbg $DEV
 fi
-
->$1
 
 for (( i = 0; i < blocks; i++ )); do
 	echo Reading block $i...
@@ -86,16 +90,13 @@ for (( i = 0; i < blocks; i++ )); do
 	if (( i % 32 == 0 )); then
 	gbdbg $DEV <<EOF
 buf a mem 0+0x4000
-buf a save $1.blk
+buf a save $tmpfile
 EOF
 	else
 	gbdbg $DEV <<EOF
 buf a mem 0x4000+0x4000
-buf a save $1.blk
+buf a save $tmpfile
 EOF
 	fi
-
-	cat $1.blk >>$1
+	cat "$tmpfile" >&3
 done
-
-rm -f $1.blk

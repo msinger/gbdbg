@@ -2,12 +2,9 @@
 
 set -e
 
-DEV=${DEV:-/dev/ttyUSB1}
+exec 3>&1 >&2
 
-if [ -z "$1" ]; then
-	echo Usage: DEV=/dev/ttyUSB1 dump_ram.sh '<file>' >&2
-	exit 2
-fi
+DEV=${DEV:-/dev/ttyUSB1}
 
 echo h | gbdbg $DEV
 
@@ -75,6 +72,15 @@ if [ $blocks -lt 0 ] ||
 	exit 1
 fi
 
+tmpfile=
+function cleanup () {
+	if [ -n "$tmpfile" ]; then
+		rm -f "$tmpfile"
+	fi
+}
+trap cleanup EXIT
+tmpfile=$(mktemp)
+
 function disable_ram () {
 	if [ -n "$has_mbc1" ] || [ -n "$has_mbc2" ]; then
 		echo wr 0 0 | gbdbg $DEV
@@ -93,8 +99,9 @@ if [ -n "$has_mbc2" ]; then
 	echo Reading MBC2 internal RAM...
 	gbdbg $DEV <<EOF
 buf a mem 0xa000+0x200
-buf a save $1
+buf a save $tmpfile
 EOF
+	cat "$tmpfile" >&3
 
 	disable_ram
 	exit 0
@@ -102,14 +109,13 @@ elif [ -n "$is2k" ]; then
 	echo Reading 2KB block...
 	gbdbg $DEV <<EOF
 buf a mem 0xa000+0x800
-buf a save $1
+buf a save $tmpfile
 EOF
+	cat "$tmpfile" >&3
 
 	disable_ram
 	exit 0
 fi
-
->$1
 
 for (( i = 0; i < blocks; i++ )); do
 	echo Reading block $i...
@@ -120,11 +126,9 @@ for (( i = 0; i < blocks; i++ )); do
 
 	gbdbg $DEV <<EOF
 buf a mem 0xa000+0x2000
-buf a save $1.blk
+buf a save $tmpfile
 EOF
-
-	cat $1.blk >>$1
+	cat "$tmpfile" >&3
 done
 
 disable_ram
-rm -f $1.blk

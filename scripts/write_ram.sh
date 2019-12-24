@@ -2,6 +2,8 @@
 
 set -e
 
+exec >&2
+
 DEV=${DEV:-/dev/ttyUSB1}
 
 echo h | gbdbg $DEV
