@@ -14,6 +14,7 @@ size=$(echo rd 0x149 | gbdbg $DEV)
 no_mbc=
 has_mbc1=
 has_mbc2=
+has_mbc3=
 
 case "$type" in
 0x00|0x08|0x09)
@@ -27,6 +28,10 @@ case "$type" in
 0x05|0x06)
 	echo Has MBC2
 	has_mbc2=y
+	;;
+0x0f|0x10|0x11|0x12|0x13)
+	echo Has MBC3
+	has_mbc3=y
 	;;
 *)
 	echo Unsupported MBC >&2
@@ -67,6 +72,7 @@ fi
 
 if [ $blocks -lt 0 ] ||
    [ -n "$has_mbc1" -a $blocks -gt 4 ] ||
+   [ -n "$has_mbc3" -a $blocks -gt 8 ] ||
    [ -n "$no_mbc" -a $blocks -gt 1 ]; then
 	echo Unknown RAM size >&2
 	exit 1
@@ -82,7 +88,7 @@ trap cleanup EXIT
 tmpfile=$(mktemp)
 
 function disable_ram () {
-	if [ -n "$has_mbc1" ] || [ -n "$has_mbc2" ]; then
+	if [ -n "$has_mbc1" ] || [ -n "$has_mbc2" ] || [ -n "$has_mbc3" ]; then
 		echo wr 0 0 | gbdbg $DEV
 	fi
 }
@@ -92,6 +98,9 @@ if [ -n "$has_mbc1" ]; then
 	echo wr 0x4000 0 | gbdbg $DEV
 	echo wr 0 0x0a | gbdbg $DEV
 elif [ -n "$has_mbc2" ]; then
+	echo wr 0 0x0a | gbdbg $DEV
+elif [ -n "$has_mbc3" ]; then
+	echo wr 0x4000 0 | gbdbg $DEV
 	echo wr 0 0x0a | gbdbg $DEV
 fi
 
@@ -122,6 +131,8 @@ for (( i = 0; i < blocks; i++ )); do
 
 	if [ -n "$has_mbc1" ]; then
 		echo wr 0x4000 $(( i & 3 )) | gbdbg $DEV
+	elif [ -n "$has_mbc3" ]; then
+		echo wr 0x4000 $(( i & 7 )) | gbdbg $DEV
 	fi
 
 	gbdbg $DEV <<EOF
