@@ -15,6 +15,7 @@ no_mbc=
 has_mbc1=
 has_mbc2=
 has_mbc3=
+has_mbc5=
 
 case "$type" in
 0x00|0x08|0x09)
@@ -32,6 +33,10 @@ case "$type" in
 0x0f|0x10|0x11|0x12|0x13)
 	echo Has MBC3
 	has_mbc3=y
+	;;
+0x19|0x1a|0x1b)
+	echo Has MBC5
+	has_mbc5=y
 	;;
 *)
 	echo Unsupported MBC >&2
@@ -59,6 +64,7 @@ if [ $blocks -lt 2 ] ||
    [ -n "$has_mbc1" -a $blocks -gt 128 ] ||
    [ -n "$has_mbc2" -a $blocks -gt 16 ] ||
    [ -n "$has_mbc3" -a $blocks -gt 128 ] ||
+   [ -n "$has_mbc5" -a $blocks -gt 65536 ] ||
    [ -n "$no_mbc" -a $blocks -gt 2 ]; then
 	echo Unknown ROM size >&2
 	exit 1
@@ -73,11 +79,17 @@ function cleanup () {
 trap cleanup EXIT
 tmpfile=$(mktemp)
 
+if [ -n "$has_mbc1" ] ||
+   [ -n "$has_mbc2" ] ||
+   [ -n "$has_mbc3" ] ||
+   [ -n "$has_mbc5" ]; then
+	echo wr 0x0000 0 | gbdbg $DEV
+fi
 if [ -n "$has_mbc1" ]; then
-	echo wr 0x0000 0 | gbdbg $DEV
 	echo wr 0x6000 0 | gbdbg $DEV
-elif [ -n "$has_mbc2" ] || [ -n "$has_mbc3" ]; then
-	echo wr 0x0000 0 | gbdbg $DEV
+fi
+if [ -n "$has_mbc5" ]; then
+	echo wr 0x4000 0 | gbdbg $DEV
 fi
 
 for (( i = 0; i < blocks; i++ )); do
@@ -90,6 +102,9 @@ for (( i = 0; i < blocks; i++ )); do
 		echo wr 0x2100 $(( i & 0xf )) | gbdbg $DEV
 	elif [ -n "$has_mbc3" ]; then
 		echo wr 0x2000 $(( i & 0x7f )) | gbdbg $DEV
+	elif [ -n "$has_mbc5" ]; then
+		echo wr 0x3000 $(( (i >> 8) & 0xff )) | gbdbg $DEV
+		echo wr 0x2000 $(( i & 0xff )) | gbdbg $DEV
 	fi
 
 	srcadr=0x4000
