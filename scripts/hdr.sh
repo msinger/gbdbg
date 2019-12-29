@@ -51,6 +51,12 @@ elif (( cart_type == 0x08 )); then
 	cart_type_str="$cart_type_str (ROM, SRAM)"
 elif (( cart_type == 0x09 )); then
 	cart_type_str="$cart_type_str (ROM, SRAM, BAT)"
+elif (( cart_type == 0x0b )); then
+	cart_type_str="$cart_type_str (ROM, MMM01)"
+elif (( cart_type == 0x0c )); then
+	cart_type_str="$cart_type_str (ROM, MMM01, SRAM)"
+elif (( cart_type == 0x0d )); then
+	cart_type_str="$cart_type_str (ROM, MMM01, SRAM, BAT)"
 elif (( cart_type == 0x0f )); then
 	cart_type_str="$cart_type_str (ROM, MBC3, RTC, BAT)"
 elif (( cart_type == 0x10 )); then
@@ -67,6 +73,24 @@ elif (( cart_type == 0x1a )); then
 	cart_type_str="$cart_type_str (ROM, MBC5, SRAM)"
 elif (( cart_type == 0x1b )); then
 	cart_type_str="$cart_type_str (ROM, MBC5, SRAM, BAT)"
+elif (( cart_type == 0x1c )); then
+	cart_type_str="$cart_type_str (ROM, MBC5, RUMBLE)"
+elif (( cart_type == 0x1d )); then
+	cart_type_str="$cart_type_str (ROM, MBC5, RUMBLE, SRAM)"
+elif (( cart_type == 0x1e )); then
+	cart_type_str="$cart_type_str (ROM, MBC5, RUMBLE, SRAM, BAT)"
+elif (( cart_type == 0x20 )); then
+	cart_type_str="$cart_type_str (ROM, MBC6, FLASH, SRAM, BAT)"
+elif (( cart_type == 0x22 )); then
+	cart_type_str="$cart_type_str (ROM, MBC7, ACCEL, EEPROM)"
+elif (( cart_type == 0xfc )); then
+	cart_type_str="$cart_type_str (Camera)"
+elif (( cart_type == 0xfd )); then
+	cart_type_str="$cart_type_str (Tamagotchi)"
+elif (( cart_type == 0xfe )); then
+	cart_type_str="$cart_type_str (ROM, HuC3)"
+elif (( cart_type == 0xff )); then
+	cart_type_str="$cart_type_str (ROM, HuC1, IR, SRAM, BAT)"
 fi
 echo "Cartridge Type:    $cart_type_str"
 
@@ -90,6 +114,12 @@ elif (( rom_size == 0x07 )); then
 	rom_size_str="$rom_size_str (4096 KByte)"
 elif (( rom_size == 0x08 )); then
 	rom_size_str="$rom_size_str (8192 KByte)"
+elif (( rom_size == 0x52 )); then
+	rom_size_str="$rom_size_str (1152 KByte)"
+elif (( rom_size == 0x53 )); then
+	rom_size_str="$rom_size_str (1280 KByte)"
+elif (( rom_size == 0x54 )); then
+	rom_size_str="$rom_size_str (1536 KByte)"
 fi
 echo "ROM Size:          $rom_size_str"
 
@@ -124,17 +154,17 @@ lic_code_str=$(printf 0x%02x $lic_code)
 if (( lic_code == 0x33 )); then
 	lic_code_str="$lic_code_str (Use Maker Code)"
 fi
-echo "Old License Code:  $lic_code_str"
+echo "Old License Code:  $lic_code_str ($lic_code)"
 
 rom_version=$(( $(dd status=none count=1 bs=1 | od -td -An) ))
 echo "Mask ROM Version:  $rom_version"
 
 complement=$(( $(dd status=none count=1 bs=1 | od -td -An) ))
 complement_str=$(printf 0x%02x $complement)
-echo "Complement Check:  $complement_str"
+echo "Complement Check:  $complement_str ($complement)"
 
 chksum_hi=$(( $(dd status=none count=1 bs=1 | od -td -An) ))
 chksum_lo=$(( $(dd status=none count=1 bs=1 | od -td -An) ))
 chksum=$(( chksum_lo | (chksum_hi << 8) ))
 chksum_str=$(printf 0x%04x $chksum)
-echo "Check Sum:         $chksum_str"
+echo "Check Sum:         $chksum_str ($chksum)"
