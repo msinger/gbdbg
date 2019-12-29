@@ -34,7 +34,7 @@ case "$type" in
 	echo Has MBC3
 	has_mbc3=y
 	;;
-0x19|0x1a|0x1b)
+0x19|0x1a|0x1b|0x1c|0x1d|0x1e)
 	echo Has MBC5
 	has_mbc5=y
 	;;
@@ -56,6 +56,9 @@ case "$size" in
 0x06) blocks=128; ;;
 0x07) blocks=256; ;;
 0x08) blocks=512; ;;
+0x52) blocks=72; ;;
+0x53) blocks=80; ;;
+0x54) blocks=96; ;;
 esac
 
 echo $blocks Blocks -- $((blocks * 16)) KBytes

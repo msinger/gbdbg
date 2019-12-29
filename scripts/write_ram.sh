@@ -16,6 +16,7 @@ has_mbc1=
 has_mbc2=
 has_mbc3=
 has_mbc5=
+has_rumble=
 
 case "$type" in
 0x00|0x08|0x09)
@@ -37,6 +38,11 @@ case "$type" in
 0x19|0x1a|0x1b)
 	echo Has MBC5
 	has_mbc5=y
+	;;
+0x1c|0x1d|0x1e)
+	echo Has MBC5 with Rumble
+	has_mbc5=y
+	has_rumble=y
 	;;
 *)
 	echo Unsupported MBC >&2
@@ -79,6 +85,7 @@ if [ $blocks -lt 0 ] ||
    [ -n "$has_mbc1" -a $blocks -gt 4 ] ||
    [ -n "$has_mbc3" -a $blocks -gt 8 ] ||
    [ -n "$has_mbc5" -a $blocks -gt 16 ] ||
+   [ -n "$has_rumble" -a $blocks -gt 8 ] ||
    [ -n "$no_mbc" -a $blocks -gt 1 ]; then
 	echo Unknown RAM size >&2
 	exit 1
