@@ -17,6 +17,8 @@ has_mbc2=
 has_mbc3=
 has_mbc5=
 has_mbc7=
+has_huc3=
+has_huc1=
 
 case "$type" in
 0x00|0x08|0x09)
@@ -42,6 +44,14 @@ case "$type" in
 0x22)
 	echo Has MBC7
 	has_mbc7=y
+	;;
+0xfe)
+	echo Has HuC3
+	has_huc3=y
+	;;
+0xff)
+	echo Has HuC1
+	has_huc1=y
 	;;
 *)
 	echo Unsupported MBC >&2
@@ -74,6 +84,8 @@ if [ $blocks -lt 2 ] ||
    [ -n "$has_mbc3" -a $blocks -gt 128 ] ||
    [ -n "$has_mbc5" -a $blocks -gt 65536 ] ||
    [ -n "$has_mbc7" -a $blocks -gt 128 ] ||
+   [ -n "$has_huc3" -a $blocks -gt 128 ] ||
+   [ -n "$has_huc1" -a $blocks -gt 64 ] ||
    [ -n "$no_mbc" -a $blocks -gt 2 ]; then
 	echo Unknown ROM size >&2
 	exit 1
@@ -92,7 +104,9 @@ if [ -n "$has_mbc1" ] ||
    [ -n "$has_mbc2" ] ||
    [ -n "$has_mbc3" ] ||
    [ -n "$has_mbc5" ] ||
-   [ -n "$has_mbc7" ]; then
+   [ -n "$has_mbc7" ] ||
+   [ -n "$has_huc3" ] ||
+   [ -n "$has_huc1" ]; then
 	echo wr 0x0000 0 | gbdbg $DEV
 fi
 if [ -n "$has_mbc1" ]; then
@@ -110,11 +124,13 @@ for (( i = 0; i < blocks; i++ )); do
 		echo wr 0x2000 $(( i & 0x1f )) | gbdbg $DEV
 	elif [ -n "$has_mbc2" ]; then
 		echo wr 0x2100 $(( i & 0xf )) | gbdbg $DEV
-	elif [ -n "$has_mbc3" ] || [ -n "$has_mbc7" ]; then
+	elif [ -n "$has_mbc3" ] || [ -n "$has_mbc7" ] || [ -n "$has_huc3" ]; then
 		echo wr 0x2000 $(( i & 0x7f )) | gbdbg $DEV
 	elif [ -n "$has_mbc5" ]; then
 		echo wr 0x3000 $(( (i >> 8) & 0xff )) | gbdbg $DEV
 		echo wr 0x2000 $(( i & 0xff )) | gbdbg $DEV
+	elif [ -n "$has_huc1" ]; then
+		echo wr 0x2000 $(( i & 0x3f )) | gbdbg $DEV
 	fi
 
 	srcadr=0x4000

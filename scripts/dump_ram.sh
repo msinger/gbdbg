@@ -16,6 +16,8 @@ has_mbc1=
 has_mbc2=
 has_mbc3=
 has_mbc5=
+has_huc3=
+has_huc1=
 has_rumble=
 
 case "$type" in
@@ -43,6 +45,14 @@ case "$type" in
 	echo Has MBC5 with Rumble
 	has_mbc5=y
 	has_rumble=y
+	;;
+0xfe)
+	echo Has HuC3
+	has_huc3=y
+	;;
+0xff)
+	echo Has HuC1
+	has_huc1=y
 	;;
 *)
 	echo Unsupported MBC >&2
@@ -85,6 +95,8 @@ if [ $blocks -lt 0 ] ||
    [ -n "$has_mbc1" -a $blocks -gt 4 ] ||
    [ -n "$has_mbc3" -a $blocks -gt 8 ] ||
    [ -n "$has_mbc5" -a $blocks -gt 16 ] ||
+   [ -n "$has_huc3" -a $blocks -gt 16 ] ||
+   [ -n "$has_huc1" -a $blocks -gt 4 ] ||
    [ -n "$has_rumble" -a $blocks -gt 8 ] ||
    [ -n "$no_mbc" -a $blocks -gt 1 ]; then
 	echo Unknown RAM size >&2
@@ -104,7 +116,9 @@ function disable_ram () {
 	if [ -n "$has_mbc1" ] ||
 	   [ -n "$has_mbc2" ] ||
 	   [ -n "$has_mbc3" ] ||
-	   [ -n "$has_mbc5" ]; then
+	   [ -n "$has_mbc5" ] ||
+	   [ -n "$has_huc3" ] ||
+	   [ -n "$has_huc1" ]; then
 		echo wr 0 0 | gbdbg $DEV
 	fi
 	if [ -n "$has_mbc5" ]; then
@@ -117,13 +131,17 @@ if [ -n "$has_mbc1" ]; then
 fi
 if [ -n "$has_mbc1" ] ||
    [ -n "$has_mbc3" ] ||
-   [ -n "$has_mbc5" ]; then
+   [ -n "$has_mbc5" ] ||
+   [ -n "$has_huc3" ] ||
+   [ -n "$has_huc1" ]; then
 	echo wr 0x4000 0 | gbdbg $DEV
 fi
 if [ -n "$has_mbc1" ] ||
    [ -n "$has_mbc2" ] ||
    [ -n "$has_mbc3" ] ||
-   [ -n "$has_mbc5" ]; then
+   [ -n "$has_mbc5" ] ||
+   [ -n "$has_huc3" ] ||
+   [ -n "$has_huc1" ]; then
 	echo wr 0 0x0a | gbdbg $DEV
 fi
 
@@ -152,11 +170,11 @@ fi
 for (( i = 0; i < blocks; i++ )); do
 	echo Reading block $i...
 
-	if [ -n "$has_mbc1" ]; then
+	if [ -n "$has_mbc1" ] || [ -n "$has_huc1" ]; then
 		echo wr 0x4000 $(( i & 3 )) | gbdbg $DEV
 	elif [ -n "$has_mbc3" ]; then
 		echo wr 0x4000 $(( i & 7 )) | gbdbg $DEV
-	elif [ -n "$has_mbc5" ]; then
+	elif [ -n "$has_mbc5" ] || [ -n "$has_huc3" ]; then
 		echo wr 0x4000 $(( i & 0xf )) | gbdbg $DEV
 	fi
 
