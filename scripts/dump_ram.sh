@@ -162,7 +162,9 @@ if [ -n "$has_mbc2" ]; then
 buf a mem 0xa000+0x200
 buf a save $tmpfile
 EOF
-	cat "$tmpfile" >&3
+	for (( i = 0; i < 256; i++ )); do
+		printf '%02x' $(( ($(od -An -td1 -N1) & 0xf) | ( ($(od -An -td1 -N1) & 0xf) << 4) )) | xxd -r -ps
+	done <"$tmpfile" >&3
 
 	disable_ram
 	exit 0

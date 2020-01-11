@@ -158,7 +158,10 @@ fi
 
 if [ -n "$has_mbc2" ]; then
 	echo Writing MBC2 internal RAM...
-	dd of="$tmpfile" bs=512 count=1
+	for (( i = 0; i < 256; i++ )); do
+		j=$(od -An -td1 -N1)
+		printf 'f%01x f%01x' $(( j & 0xf )) $(( (j & 0xf0) >> 4 )) | xxd -r -ps
+	done >"$tmpfile"
 	gbdbg $DEV <<EOF
 buf a file $tmpfile
 buf a store 0xa000+0x200
