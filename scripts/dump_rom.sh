@@ -7,6 +7,7 @@ exec 3>&1 >&2
 DEV=${DEV:-/dev/ttyUSB1}
 
 echo h | gbdbg $DEV
+echo wr 0xff50 1 | gbdbg $DEV
 
 type=$(echo rd 0x147 | gbdbg $DEV)
 size=$(echo rd 0x148 | gbdbg $DEV)
@@ -14,6 +15,7 @@ size=$(echo rd 0x148 | gbdbg $DEV)
 no_mbc=
 has_mbc1=
 has_mbc2=
+has_mmm01=
 has_mbc3=
 has_mbc5=
 has_mbc7=
@@ -32,6 +34,10 @@ case "$type" in
 0x05|0x06)
 	echo Has MBC2
 	has_mbc2=y
+	;;
+0x0b|0x0c|0x0d)
+	echo Has MMM01
+	has_mmm01=y
 	;;
 0x0f|0x10|0x11|0x12|0x13)
 	echo Has MBC3
@@ -81,8 +87,9 @@ echo $blocks Blocks -- $((blocks * 16)) KBytes
 if [ $blocks -lt 2 ] ||
    [ -n "$has_mbc1" -a $blocks -gt 128 ] ||
    [ -n "$has_mbc2" -a $blocks -gt 16 ] ||
+   [ -n "$has_mmm01" -a $blocks -gt 512 ] ||
    [ -n "$has_mbc3" -a $blocks -gt 128 ] ||
-   [ -n "$has_mbc5" -a $blocks -gt 65536 ] ||
+   [ -n "$has_mbc5" -a $blocks -gt 512 ] ||
    [ -n "$has_mbc7" -a $blocks -gt 128 ] ||
    [ -n "$has_huc3" -a $blocks -gt 128 ] ||
    [ -n "$has_huc1" -a $blocks -gt 64 ] ||
@@ -102,6 +109,7 @@ tmpfile=$(mktemp)
 
 if [ -n "$has_mbc1" ] ||
    [ -n "$has_mbc2" ] ||
+   [ -n "$has_mmm01" ] ||
    [ -n "$has_mbc3" ] ||
    [ -n "$has_mbc5" ] ||
    [ -n "$has_mbc7" ] ||
@@ -109,14 +117,37 @@ if [ -n "$has_mbc1" ] ||
    [ -n "$has_huc1" ]; then
 	echo wr 0x0000 0 | gbdbg $DEV
 fi
-if [ -n "$has_mbc1" ]; then
+if [ -n "$has_mbc1" ] ||
+   [ -n "$has_mmm01" ]; then
 	echo wr 0x6000 0 | gbdbg $DEV
 fi
-if [ -n "$has_mbc5" ]; then
+if [ -n "$has_mmm01" ] ||
+   [ -n "$has_mbc5" ]; then
 	echo wr 0x4000 0 | gbdbg $DEV
 fi
+if [ -n "$has_mmm01" ]; then
+	echo wr 0x2000 0 | gbdbg $DEV
+fi
+
+function setup_mmm01 () {
+	local bank=$1
+	echo wr 0x2000 $(( bank & 0x7f )) | gbdbg $DEV
+	echo wr 0x6000 1 | gbdbg $DEV
+	echo wr 0x4000 $(( 0x40 | ( (bank & 0x180) >> 3 ) )) | gbdbg $DEV
+	echo wr 0x0000 0x40 | gbdbg $DEV
+}
 
 for (( i = 0; i < blocks; i++ )); do
+	if [ -n "$has_mmm01" ] && (( (i & 0x1f) == 0 )); then
+		if (( i > 0 )); then
+			echo MMM01 needs reset: Please reset target, then press enter... >&2
+			read
+			echo h | gbdbg $DEV
+			echo wr 0xff50 1 | gbdbg $DEV
+		fi
+		setup_mmm01 $i
+	fi
+
 	echo Reading block $i...
 
 	if [ -n "$has_mbc1" ]; then
@@ -124,10 +155,12 @@ for (( i = 0; i < blocks; i++ )); do
 		echo wr 0x2000 $(( i & 0x1f )) | gbdbg $DEV
 	elif [ -n "$has_mbc2" ]; then
 		echo wr 0x2100 $(( i & 0xf )) | gbdbg $DEV
+	elif [ -n "$has_mmm01" ]; then
+		echo wr 0x2000 $(( i & 0x1f )) | gbdbg $DEV
 	elif [ -n "$has_mbc3" ] || [ -n "$has_mbc7" ] || [ -n "$has_huc3" ]; then
 		echo wr 0x2000 $(( i & 0x7f )) | gbdbg $DEV
 	elif [ -n "$has_mbc5" ]; then
-		echo wr 0x3000 $(( (i >> 8) & 0xff )) | gbdbg $DEV
+		echo wr 0x3000 $(( (i >> 8) & 1 )) | gbdbg $DEV
 		echo wr 0x2000 $(( i & 0xff )) | gbdbg $DEV
 	elif [ -n "$has_huc1" ]; then
 		echo wr 0x2000 $(( i & 0x3f )) | gbdbg $DEV
@@ -136,7 +169,7 @@ for (( i = 0; i < blocks; i++ )); do
 	srcadr=0x4000
 	if (( i == 0 )); then
 		srcadr=0
-	elif [ -n "$has_mbc1" ] && (( i % 32 == 0 )); then
+	elif [ -n "$has_mmm01" ] && (( (i & 0x1f) == 0 )); then
 		srcadr=0
 	fi
 

@@ -7,6 +7,7 @@ exec >&2
 DEV=${DEV:-/dev/ttyUSB1}
 
 echo h | gbdbg $DEV
+echo wr 0xff50 1 | gbdbg $DEV
 
 type=$(echo rd 0x147 | gbdbg $DEV)
 size=$(echo rd 0x149 | gbdbg $DEV)
@@ -14,6 +15,7 @@ size=$(echo rd 0x149 | gbdbg $DEV)
 no_mbc=
 has_mbc1=
 has_mbc2=
+has_mmm01=
 has_mbc3=
 has_mbc5=
 has_huc3=
@@ -32,6 +34,10 @@ case "$type" in
 0x05|0x06)
 	echo Has MBC2
 	has_mbc2=y
+	;;
+0x0b|0x0c|0x0d)
+	echo Has MMM01
+	has_mmm01=y
 	;;
 0x0f|0x10|0x11|0x12|0x13)
 	echo Has MBC3
@@ -93,6 +99,7 @@ fi
 
 if [ $blocks -lt 0 ] ||
    [ -n "$has_mbc1" -a $blocks -gt 4 ] ||
+   [ -n "$has_mmm01" -a $blocks -gt 16 ] ||
    [ -n "$has_mbc3" -a $blocks -gt 8 ] ||
    [ -n "$has_mbc5" -a $blocks -gt 16 ] ||
    [ -n "$has_huc3" -a $blocks -gt 16 ] ||
@@ -115,6 +122,7 @@ tmpfile=$(mktemp)
 function disable_ram () {
 	if [ -n "$has_mbc1" ] ||
 	   [ -n "$has_mbc2" ] ||
+	   [ -n "$has_mmm01" ] ||
 	   [ -n "$has_mbc3" ] ||
 	   [ -n "$has_mbc5" ] ||
 	   [ -n "$has_huc3" ] ||
@@ -126,10 +134,8 @@ function disable_ram () {
 	fi
 }
 
-if [ -n "$has_mbc1" ]; then
-	echo wr 0x6000 1 | gbdbg $DEV
-fi
 if [ -n "$has_mbc1" ] ||
+   [ -n "$has_mmm01" ] ||
    [ -n "$has_mbc3" ] ||
    [ -n "$has_mbc5" ] ||
    [ -n "$has_huc3" ] ||
@@ -137,7 +143,12 @@ if [ -n "$has_mbc1" ] ||
 	echo wr 0x4000 0 | gbdbg $DEV
 fi
 if [ -n "$has_mbc1" ] ||
+   [ -n "$has_mmm01" ]; then
+	echo wr 0x6000 1 | gbdbg $DEV
+fi
+if [ -n "$has_mbc1" ] ||
    [ -n "$has_mbc2" ] ||
+   [ -n "$has_mmm01" ] ||
    [ -n "$has_mbc3" ] ||
    [ -n "$has_mbc5" ] ||
    [ -n "$has_huc3" ] ||
@@ -174,7 +185,7 @@ for (( i = 0; i < blocks; i++ )); do
 		echo wr 0x4000 $(( i & 3 )) | gbdbg $DEV
 	elif [ -n "$has_mbc3" ]; then
 		echo wr 0x4000 $(( i & 7 )) | gbdbg $DEV
-	elif [ -n "$has_mbc5" ] || [ -n "$has_huc3" ]; then
+	elif [ -n "$has_mmm01" ] || [ -n "$has_mbc5" ] || [ -n "$has_huc3" ]; then
 		echo wr 0x4000 $(( i & 0xf )) | gbdbg $DEV
 	fi
 
