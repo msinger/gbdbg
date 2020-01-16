@@ -18,6 +18,7 @@ has_mbc2=
 has_mmm01=
 has_mbc3=
 has_mbc5=
+has_macgbd=
 has_huc3=
 has_huc1=
 has_rumble=
@@ -51,6 +52,10 @@ case "$type" in
 	echo Has MBC5 with Rumble
 	has_mbc5=y
 	has_rumble=y
+	;;
+0xfc)
+	echo Has MAC-GBD '(Game Boy Camera)'
+	has_macgbd=y
 	;;
 0xfe)
 	echo Has HuC3
@@ -102,6 +107,7 @@ if [ $blocks -lt 0 ] ||
    [ -n "$has_mmm01" -a $blocks -gt 16 ] ||
    [ -n "$has_mbc3" -a $blocks -gt 8 ] ||
    [ -n "$has_mbc5" -a $blocks -gt 16 ] ||
+   [ -n "$has_macgbd" -a $blocks -gt 16 ] ||
    [ -n "$has_huc3" -a $blocks -gt 16 ] ||
    [ -n "$has_huc1" -a $blocks -gt 4 ] ||
    [ -n "$has_rumble" -a $blocks -gt 8 ] ||
@@ -125,6 +131,7 @@ function disable_ram () {
 	   [ -n "$has_mmm01" ] ||
 	   [ -n "$has_mbc3" ] ||
 	   [ -n "$has_mbc5" ] ||
+	   [ -n "$has_macgbd" ] ||
 	   [ -n "$has_huc3" ] ||
 	   [ -n "$has_huc1" ]; then
 		echo wr 0 0 | gbdbg $DEV
@@ -134,10 +141,14 @@ function disable_ram () {
 	fi
 }
 
+if [ -n "$has_macgbd" ]; then
+	disable_ram
+fi
 if [ -n "$has_mbc1" ] ||
    [ -n "$has_mmm01" ] ||
    [ -n "$has_mbc3" ] ||
    [ -n "$has_mbc5" ] ||
+   [ -n "$has_macgbd" ] ||
    [ -n "$has_huc3" ] ||
    [ -n "$has_huc1" ]; then
 	echo wr 0x4000 0 | gbdbg $DEV
@@ -187,7 +198,7 @@ for (( i = 0; i < blocks; i++ )); do
 		echo wr 0x4000 $(( i & 3 )) | gbdbg $DEV
 	elif [ -n "$has_mbc3" ]; then
 		echo wr 0x4000 $(( i & 7 )) | gbdbg $DEV
-	elif [ -n "$has_mmm01" ] || [ -n "$has_mbc5" ] || [ -n "$has_huc3" ]; then
+	elif [ -n "$has_mmm01" ] || [ -n "$has_mbc5" ] || [ -n "$has_macgbd" ] || [ -n "$has_huc3" ]; then
 		echo wr 0x4000 $(( i & 0xf )) | gbdbg $DEV
 	fi
 

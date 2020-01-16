@@ -19,6 +19,7 @@ has_mmm01=
 has_mbc3=
 has_mbc5=
 has_mbc7=
+has_macgbd=
 has_huc3=
 has_huc1=
 
@@ -50,6 +51,10 @@ case "$type" in
 0x22)
 	echo Has MBC7
 	has_mbc7=y
+	;;
+0xfc)
+	echo Has MAC-GBD '(Game Boy Camera)'
+	has_macgbd=y
 	;;
 0xfe)
 	echo Has HuC3
@@ -91,6 +96,7 @@ if [ $blocks -lt 2 ] ||
    [ -n "$has_mbc3" -a $blocks -gt 128 ] ||
    [ -n "$has_mbc5" -a $blocks -gt 512 ] ||
    [ -n "$has_mbc7" -a $blocks -gt 128 ] ||
+   [ -n "$has_macgbd" -a $blocks -gt 64 ] ||
    [ -n "$has_huc3" -a $blocks -gt 128 ] ||
    [ -n "$has_huc1" -a $blocks -gt 64 ] ||
    [ -n "$no_mbc" -a $blocks -gt 2 ]; then
@@ -113,6 +119,7 @@ if [ -n "$has_mbc1" ] ||
    [ -n "$has_mbc3" ] ||
    [ -n "$has_mbc5" ] ||
    [ -n "$has_mbc7" ] ||
+   [ -n "$has_macgbd" ] ||
    [ -n "$has_huc3" ] ||
    [ -n "$has_huc1" ]; then
 	echo wr 0x0000 0 | gbdbg $DEV
@@ -162,7 +169,7 @@ for (( i = 0; i < blocks; i++ )); do
 	elif [ -n "$has_mbc5" ]; then
 		echo wr 0x3000 $(( (i >> 8) & 1 )) | gbdbg $DEV
 		echo wr 0x2000 $(( i & 0xff )) | gbdbg $DEV
-	elif [ -n "$has_huc1" ]; then
+	elif [ -n "$has_macgbd" ] || [ -n "$has_huc1" ]; then
 		echo wr 0x2000 $(( i & 0x3f )) | gbdbg $DEV
 	fi
 
