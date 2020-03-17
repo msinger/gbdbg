@@ -20,6 +20,7 @@ has_mbc3=
 has_mbc5=
 has_mbc7=
 has_macgbd=
+has_tama5=
 has_huc3=
 has_huc1=
 
@@ -55,6 +56,10 @@ case "$type" in
 0xfc)
 	echo Has MAC-GBD '(Game Boy Camera)'
 	has_macgbd=y
+	;;
+0xfd)
+	echo Has TAMA5
+	has_tama5=y
 	;;
 0xfe)
 	echo Has HuC3
@@ -97,6 +102,7 @@ if [ $blocks -lt 2 ] ||
    [ -n "$has_mbc5" -a $blocks -gt 512 ] ||
    [ -n "$has_mbc7" -a $blocks -gt 128 ] ||
    [ -n "$has_macgbd" -a $blocks -gt 64 ] ||
+   [ -n "$has_tama5" -a $blocks -gt 32 ] ||
    [ -n "$has_huc3" -a $blocks -gt 128 ] ||
    [ -n "$has_huc1" -a $blocks -gt 64 ] ||
    [ -n "$no_mbc" -a $blocks -gt 2 ]; then
@@ -135,6 +141,14 @@ fi
 if [ -n "$has_mmm01" ]; then
 	echo wr 0x2000 0 | gbdbg $DEV
 fi
+if [ -n "$has_tama5" ]; then
+	echo wr 0xa001 0xa | gbdbg $DEV
+	sleep 1
+	if (( ( 0xf & $(echo rd 0xa000 | gbdbg $DEV) ) != 1 )); then
+		echo TAMA5 does not read 1 from 0xA000 >&2
+		exit 1
+	fi
+fi
 
 function setup_mmm01 () {
 	local bank=$1
@@ -171,6 +185,11 @@ for (( i = 0; i < blocks; i++ )); do
 		echo wr 0x2000 $(( i & 0xff )) | gbdbg $DEV
 	elif [ -n "$has_macgbd" ] || [ -n "$has_huc1" ]; then
 		echo wr 0x2000 $(( i & 0x3f )) | gbdbg $DEV
+	elif [ -n "$has_tama5" ]; then
+		echo wr 0xa001 1 | gbdbg $DEV
+		echo wr 0xa000 $(( (i >> 4) & 1 )) | gbdbg $DEV
+		echo wr 0xa001 0 | gbdbg $DEV
+		echo wr 0xa000 $(( i & 0xf )) | gbdbg $DEV
 	fi
 
 	srcadr=0x4000
