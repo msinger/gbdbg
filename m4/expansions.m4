@@ -84,13 +84,11 @@ AC_MSG_CHECKING([whether $CSC accepts -codepage:utf8])
 $CSC -target:exe -out:test_out.exe -codepage:utf8 test_in.cs >/dev/null 2>&1
 if test "x${?}" = "x0"; then
 	AC_MSG_RESULT(yes)
-	rm -f test_out.exe{,.mdb} test_in.cs
 	AC_SUBST(CSC_CODEPAGE_UTF8, -codepage:utf8)dnl
 else
 	$CSC -target:exe -out:test_out.exe -codepage:65001 test_in.cs >/dev/null 2>&1
 	if test "x${?}" = "x0"; then
 		AC_MSG_RESULT([no (but -codepage:65001 works)])
-		rm -f test_out.exe{,.mdb} test_in.cs
 		AC_SUBST(CSC_CODEPAGE_UTF8, -codepage:65001)dnl
 	else
 		AC_MSG_RESULT(no)
@@ -99,6 +97,7 @@ else
 	fi
 fi
 AC_SUBST(CSC_CODEPAGE_ARG, \$\{CSC_CODEPAGE_UTF8\})dnl
+rm -f test_out.exe{,.mdb} test_in.cs
 
 # -debug option
 AC_SUBST(CSC_DEBUG, "-debug+ -define:DEBUG")dnl
@@ -150,11 +149,9 @@ AC_DEFUN([MY_CSC_CHECK_ARGS],
 if test "x$1" = "xno"; then
 	AC_SUBST(CSC_DEBUG_ARG, \$\{CSC_NO_DEBUG\})dnl
 	AC_SUBST(CSC_OPT_ARG, \$\{CSC_OPT\})dnl
-	AC_SUBST(CSC_CHK_ARG, \$\{CSC_NO_CHK\})dnl
 else
 	AC_SUBST(CSC_DEBUG_ARG, \$\{CSC_DEBUG\})dnl
 	AC_SUBST(CSC_OPT_ARG, \$\{CSC_NO_OPT\})dnl
-	AC_SUBST(CSC_CHK_ARG, \$\{CSC_CHK\})dnl
 fi
 
 AC_SUBST(CSC_COMMON_ARGS,
@@ -163,8 +160,7 @@ AC_SUBST(CSC_COMMON_ARGS,
  \${CSC_CODEPAGE_ARG}dnl
  \${CSC_IMPLICIT_REFS_ARG}dnl
  \${CSC_DEBUG_ARG}dnl
- \${CSC_OPT_ARG}dnl
- \${CSC_CHK_ARG}")dnl
+ \${CSC_OPT_ARG}")dnl
 AC_SUBST(CSC_ALL_ARGS,
 "\${CSFLAGS}dnl
  \${CSC_COMMON_ARGS}dnl
@@ -183,6 +179,118 @@ if test "x$csc_ret" = "x0"; then
 else
 	AC_MSG_RESULT(no)
 	AC_MSG_ERROR(['$CSC -target:exe -out:test_out.exe $csc_args_eval test_in.cs' failed with exit code $csc_ret])
+fi
+])dnl
+dnl
+AC_DEFUN([MY_PROG_NCC],
+[dnl
+# Nemerle compiler
+AC_ARG_VAR(NCC, [Nemerle compiler (overrides auto detection)])
+if test -z "$NCC"; then
+	AC_PATH_PROG(NCC, ncc, [])
+	if test -z "$NCC"; then
+		AC_MSG_ERROR([ncc not found])
+	fi
+fi
+AC_MSG_CHECKING([whether the Nemerle compiler works])
+cat >test_in.n <<EOF
+public module Program { public static Main() : void { } }
+EOF
+$NCC -target:exe -out:test_out.exe test_in.n >/dev/null 2>&1
+ncc_ret=${?}
+if test "x$ncc_ret" = "x0"; then
+	AC_MSG_RESULT(yes)
+else
+	AC_MSG_RESULT(no)
+dnl	rm -f test_out.exe{,.mdb} test_in.n
+	AC_MSG_ERROR(['$NCC -target:exe -out:test_out.exe test_in.n' failed with exit code $ncc_ret])
+fi
+AC_ARG_VAR(NFLAGS, [Additional arguments passed to Nemerle compiler])
+
+# ncc options
+
+# -progress-bar option
+AC_MSG_CHECKING([whether $NCC accepts -progress-bar{+|-}])
+$NCC -target:exe -out:test_out.exe -progress-bar+ test_in.n >/dev/null 2>&1
+if test "x${?}" = "x0"; then
+	AC_MSG_RESULT(yes)
+	AC_SUBST(NCC_BAR, -progress-bar+)dnl
+	AC_SUBST(NCC_NO_BAR, -progress-bar-)dnl
+else
+	$NCC -target:exe -out:test_out.exe -bar test_in.n >/dev/null 2>&1
+	if test "x${?}" = "x0"; then
+		AC_MSG_RESULT([no (using -bar instead)])
+		AC_SUBST(NCC_BAR, -bar)dnl
+		AC_SUBST(NCC_NO_BAR, [])dnl
+	else
+		AC_MSG_RESULT(no)
+		AC_SUBST(NCC_BAR, [])dnl
+		AC_SUBST(NCC_NO_BAR, [])dnl
+	fi
+fi
+rm -f test_out.exe{,.mdb} test_in.n
+
+# -debug option
+AC_SUBST(NCC_DEBUG, "-debug+ -define:DEBUG")dnl
+AC_SUBST(NCC_NO_DEBUG, -debug-)dnl
+
+# -optimize option
+AC_SUBST(NCC_OPT, -optimize)dnl
+AC_SUBST(NCC_NO_OPT, [])dnl
+
+# -checked option
+AC_SUBST(NCC_CHK, -checked+)dnl
+AC_SUBST(NCC_NO_CHK, -checked-)dnl
+
+# -target option
+AC_SUBST(NCC_TARGET_PREFIX, -target:)dnl
+AC_SUBST(NCC_CONSOLE_TARGET, exe)dnl
+AC_SUBST(NCC_WINDOWS_TARGET, winexe)dnl
+AC_SUBST(NCC_LIBRARY_TARGET, library)dnl
+
+# other options
+AC_SUBST(NCC_WARN_ARG, -warn:5)dnl
+AC_SUBST(gen_NCC_OUT_ARG, -out:\'\$[]1\')dnl
+])dnl
+dnl
+AC_DEFUN([MY_NCC_CHECK_ARGS],
+[dnl
+if test "x$1" = "xno"; then
+	AC_SUBST(NCC_DEBUG_ARG, \$\{NCC_NO_DEBUG\})dnl
+	AC_SUBST(NCC_OPT_ARG, \$\{NCC_OPT\})dnl
+else
+	AC_SUBST(NCC_DEBUG_ARG, \$\{NCC_DEBUG\})dnl
+	AC_SUBST(NCC_OPT_ARG, \$\{NCC_NO_OPT\})dnl
+fi
+if test "x$2" = "xno"; then
+	AC_SUBST(NCC_BAR_ARG, \$\{NCC_NO_BAR\})dnl
+else
+	AC_SUBST(NCC_BAR_ARG, \$\{NCC_BAR\})dnl
+fi
+
+AC_SUBST(NCC_COMMON_ARGS,
+"\${NCC_WARN_ARG}dnl
+ \${NCC_DEBUG_ARG}dnl
+ \${NCC_OPT_ARG}dnl
+ \${NCC_BAR_ARG}")dnl
+AC_SUBST(NCC_ALL_ARGS,
+"\${NFLAGS}dnl
+ \${NCC_COMMON_ARGS}dnl
+ \${NCC_ARGS}")dnl
+ncc_args_eval="$NFLAGS $(eval eval echo $NCC_COMMON_ARGS)"
+
+AC_MSG_CHECKING([whether $NCC accepts the common arguments])
+cat >test_in.n <<EOF
+public module Program { public static Main() : void { } }
+EOF
+$NCC -target:exe -out:test_out.exe $ncc_args_eval test_in.n >/dev/null 2>&1
+ncc_ret=${?}
+rm -f test_out.exe{,.mdb} test_in.n
+if test "x$ncc_ret" = "x0"; then
+	AC_MSG_RESULT(yes)
+else
+	AC_MSG_RESULT(no)
+	AC_MSG_ERROR(['$NCC -target:exe -out:test_out.exe $ncc_args_eval test_in.n' failed with exit code $ncc_ret])
 fi
 ])dnl
 dnl

@@ -126,7 +126,7 @@ ASSEMBLY_MDB =
 endif
 
 $(if $(word 2,$(abs_srcdir)),$(error whitespaces in srcdir are not supported))
-$(if $(word 2,$(abs_builddir)),$(error whitespaces in builddir are not supported)o)
+$(if $(word 2,$(abs_builddir)),$(error whitespaces in builddir are not supported))
 
 RESGEN = resgen2
 
