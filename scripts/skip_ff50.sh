@@ -199,6 +199,12 @@ ld a, (hl)
 bit 2, a
 jr z, -5
 
+; If there is no delay in the comparator signal, then the clock
+; output line (bit 0 in 0xff40) should be high at this point.
+; But with an 1 tick delay it should be low already. In this case
+; the first resetting of the clock line during "manually" clocking
+; below would be unnecessary, but it doesn't hurt either.
+
 ; LED
 ld a, 3
 ld (0xff00), a
@@ -224,11 +230,6 @@ ld a, 6
 ld (0xff10), a
 ld a, 1
 ld (0xff42), a
-
-; Clock output should be high now -- hang here if it is not
-ld a, (0xff40)
-bit 0, a
-jr z, -2
 
 ; LED
 ld a, 4
