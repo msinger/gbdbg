@@ -478,7 +478,7 @@ namespace gbdbg
 											sout.Write("> ");
 										string asmline = cmdin.ReadLine();
 
-										if (asmline == null || asmline == "end")
+										if (asmline == null || asmline.Trim() == "end")
 										{
 											if (interactive)
 												sout.WriteLine();

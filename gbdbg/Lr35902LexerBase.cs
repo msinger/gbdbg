@@ -58,7 +58,7 @@ namespace gbdbg
 			}
 
 			// Space, Tab, ...?
-			if (char.GetUnicodeCategory(c) == UnicodeCategory.SpaceSeparator)
+			if (char.GetUnicodeCategory(c) == UnicodeCategory.SpaceSeparator || c == '\t')
 				goto read;
 
 			// Start of name?
