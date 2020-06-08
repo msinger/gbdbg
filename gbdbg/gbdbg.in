@@ -9,7 +9,6 @@ MONO_EXEC="exec -a gbdbg mono"
 EXE_PATH="${libexecdir}/@PACKAGE@/gbdbg.exe"
 
 FORCE_DEBUG=yes
-REDIRECT_LOG="${XDG_CONFIG_HOME:-$HOME/.config}/@PACKAGE@/server_log"
 
 for arg in "$@"; do
 	case "x$arg" in
@@ -24,10 +23,6 @@ for arg in "$@"; do
 			;;
 		x--trace*)
 			MONO_OPTIONS+=("$arg")
-			shift
-			;;
-		x--no-log)
-			unset REDIRECT_LOG
 			shift
 			;;
 		x--no-debug)
@@ -51,13 +46,4 @@ if [ -z FORCE_DEBUG ]; then
 	MONO_OPTIONS+=("--debug")
 fi
 
-if [ -n "${MONO_OPTIONS[0]}" ]; then
-	echo "** Running with Mono options: ${MONO_OPTIONS[@]} **"
-fi
-
-if [ -n "$REDIRECT_LOG" ]; then
-	mkdir -p `dirname "$REDIRECT_LOG"`
-	$MONO_EXEC "${MONO_OPTIONS[@]}" "$EXE_PATH" "${ARGS[@]}" 2>&1 | tee "$REDIRECT_LOG"
-else
-	$MONO_EXEC "${MONO_OPTIONS[@]}" "$EXE_PATH" "${ARGS[@]}"
-fi
+$MONO_EXEC "${MONO_OPTIONS[@]}" "$EXE_PATH" "${ARGS[@]}"
