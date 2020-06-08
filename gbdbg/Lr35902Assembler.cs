@@ -992,6 +992,9 @@ namespace gbdbg
 					}
 				}
 				throw new AsmFormatException(t.Arg[0].Pos, "One of $00, $08, $10, $18, $20, $28, $30 or $38 expected.");
+
+			default:
+				throw new AsmFormatException(t.Pos, "Unknown instruction mnemonic.");
 			}
 		}
 
