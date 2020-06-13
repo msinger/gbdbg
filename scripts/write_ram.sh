@@ -18,6 +18,7 @@ has_mbc2=
 has_mmm01=
 has_mbc3=
 has_mbc5=
+has_mbc6=
 has_macgbd=
 has_huc3=
 has_huc1=
@@ -47,6 +48,10 @@ case "$type" in
 0x19|0x1a|0x1b)
 	echo Has MBC5
 	has_mbc5=y
+	;;
+0x20)
+	echo Has MBC6
+	has_mbc6=y
 	;;
 0x1c|0x1d|0x1e)
 	echo Has MBC5 with Rumble
@@ -107,6 +112,7 @@ if [ $blocks -lt 0 ] ||
    [ -n "$has_mmm01" -a $blocks -gt 16 ] ||
    [ -n "$has_mbc3" -a $blocks -gt 8 ] ||
    [ -n "$has_mbc5" -a $blocks -gt 16 ] ||
+   [ -n "$has_mbc6" -a $blocks -gt 64 ] ||
    [ -n "$has_macgbd" -a $blocks -gt 16 ] ||
    [ -n "$has_huc3" -a $blocks -gt 16 ] ||
    [ -n "$has_huc1" -a $blocks -gt 4 ] ||
@@ -131,6 +137,7 @@ function disable_ram () {
 	   [ -n "$has_mmm01" ] ||
 	   [ -n "$has_mbc3" ] ||
 	   [ -n "$has_mbc5" ] ||
+	   [ -n "$has_mbc6" ] ||
 	   [ -n "$has_macgbd" ] ||
 	   [ -n "$has_huc3" ] ||
 	   [ -n "$has_huc1" ]; then
@@ -141,6 +148,13 @@ function disable_ram () {
 	fi
 }
 
+if [ -n "$has_mbc6" ]; then
+	echo wr 0x1000 1 | gbdbg $DEV
+	echo wr 0x0c00 0 | gbdbg $DEV
+	echo wr 0x1000 0 | gbdbg $DEV
+	echo wr 0x2800 0 | gbdbg $DEV
+	echo wr 0x3800 0 | gbdbg $DEV
+fi
 if [ -n "$has_mbc1" ] ||
    [ -n "$has_mmm01" ] ||
    [ -n "$has_mbc3" ] ||
@@ -159,6 +173,7 @@ if [ -n "$has_mbc1" ] ||
    [ -n "$has_mmm01" ] ||
    [ -n "$has_mbc3" ] ||
    [ -n "$has_mbc5" ] ||
+   [ -n "$has_mbc6" ] ||
    [ -n "$has_macgbd" ] ||
    [ -n "$has_huc3" ] ||
    [ -n "$has_huc1" ]; then
@@ -199,6 +214,9 @@ for (( i = 0; i < blocks; i++ )); do
 		echo wr 0x4000 $(( i & 7 )) | gbdbg $DEV
 	elif [ -n "$has_mmm01" ] || [ -n "$has_mbc5" ] || [ -n "$has_macgbd" ] || [ -n "$has_huc3" ]; then
 		echo wr 0x4000 $(( i & 0xf )) | gbdbg $DEV
+	elif [ -n "$has_mbc6" ]; then
+		echo wr 0x0400 $(( (i & 0x3f) << 1 )) | gbdbg $DEV
+		echo wr 0x0800 $(( ( (i & 0x3f) << 1) | 1 )) | gbdbg $DEV
 	fi
 
 	dd of="$tmpfile" bs=8192 count=1

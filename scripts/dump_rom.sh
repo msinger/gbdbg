@@ -18,6 +18,7 @@ has_mbc2=
 has_mmm01=
 has_mbc3=
 has_mbc5=
+has_mbc6=
 has_mbc7=
 has_macgbd=
 has_tama5=
@@ -48,6 +49,10 @@ case "$type" in
 0x19|0x1a|0x1b|0x1c|0x1d|0x1e)
 	echo Has MBC5
 	has_mbc5=y
+	;;
+0x20)
+	echo Has MBC6
+	has_mbc6=y
 	;;
 0x22)
 	echo Has MBC7
@@ -100,6 +105,7 @@ if [ $blocks -lt 2 ] ||
    [ -n "$has_mmm01" -a $blocks -gt 512 ] ||
    [ -n "$has_mbc3" -a $blocks -gt 128 ] ||
    [ -n "$has_mbc5" -a $blocks -gt 512 ] ||
+   [ -n "$has_mbc6" -a $blocks -gt 64 ] ||
    [ -n "$has_mbc7" -a $blocks -gt 128 ] ||
    [ -n "$has_macgbd" -a $blocks -gt 64 ] ||
    [ -n "$has_tama5" -a $blocks -gt 32 ] ||
@@ -124,11 +130,19 @@ if [ -n "$has_mbc1" ] ||
    [ -n "$has_mmm01" ] ||
    [ -n "$has_mbc3" ] ||
    [ -n "$has_mbc5" ] ||
+   [ -n "$has_mbc6" ] ||
    [ -n "$has_mbc7" ] ||
    [ -n "$has_macgbd" ] ||
    [ -n "$has_huc3" ] ||
    [ -n "$has_huc1" ]; then
 	echo wr 0x0000 0 | gbdbg $DEV
+fi
+if [ -n "$has_mbc6" ]; then
+	echo wr 0x1000 1 | gbdbg $DEV
+	echo wr 0x0c00 0 | gbdbg $DEV
+	echo wr 0x1000 0 | gbdbg $DEV
+	echo wr 0x2800 0 | gbdbg $DEV
+	echo wr 0x3800 0 | gbdbg $DEV
 fi
 if [ -n "$has_mbc1" ] ||
    [ -n "$has_mmm01" ]; then
@@ -183,6 +197,9 @@ for (( i = 0; i < blocks; i++ )); do
 	elif [ -n "$has_mbc5" ]; then
 		echo wr 0x3000 $(( (i >> 8) & 1 )) | gbdbg $DEV
 		echo wr 0x2000 $(( i & 0xff )) | gbdbg $DEV
+	elif [ -n "$has_mbc6" ]; then
+		echo wr 0x2000 $(( (i & 0x3f) << 1 )) | gbdbg $DEV
+		echo wr 0x3000 $(( ( (i & 0x3f) << 1) | 1 )) | gbdbg $DEV
 	elif [ -n "$has_macgbd" ] || [ -n "$has_huc1" ]; then
 		echo wr 0x2000 $(( i & 0x3f )) | gbdbg $DEV
 	elif [ -n "$has_tama5" ]; then
