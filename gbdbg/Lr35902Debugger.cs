@@ -17,7 +17,8 @@ namespace gbdbg
 			Arg   = 0x000c,
 			PC    = 0x00f0,
 			SP    = 0x0f00,
-			Regs  = Flags | PC | SP,
+			WZ    = 0xf000,
+			Regs  = Flags | PC | SP | WZ,
 			Cpu   = Regs | Arg,
 			All   = Cpu | State,
 		}
@@ -27,7 +28,7 @@ namespace gbdbg
 			public F F;
 			public bool NoInc, Halt, IME;
 			public byte Arg;
-			public ushort PC, SP;
+			public ushort PC, SP, WZ;
 		}
 
 		private struct DriveData
@@ -88,6 +89,7 @@ namespace gbdbg
 			s.Arg   = buf[1];
 			s.PC    = (ushort)(((int)buf[3] << 8) | buf[2]);
 			s.SP    = (ushort)(((int)buf[5] << 8) | buf[4]);
+			s.WZ    = (ushort)(((int)buf[7] << 8) | buf[6]);
 			return s;
 		}
 
@@ -197,6 +199,7 @@ namespace gbdbg
 				Regs r;
 				r.PC = s.PC;
 				r.SP = s.SP;
+				r.WZ = s.WZ;
 				r.F = s.F;
 				r.IME = s.IME;
 
