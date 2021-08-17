@@ -7,7 +7,7 @@ namespace gbdbg
 {
 	class MainClass
 	{
-		private static Lr35902Debugger debugger;
+		private static Sm83Debugger debugger;
 
 		private static bool ValidAdrRange(Range range)
 		{
@@ -135,10 +135,10 @@ namespace gbdbg
 						break;
 					case "r":
 						{
-							Lr35902Registers regs = debugger.Registers;
+							Sm83Registers regs = debugger.Registers;
 							sout.WriteLine(regs);
 							System.IO.Stream mem = debugger.OpenMemory(regs.PC);
-							Lr35902Disassembler dis = new Lr35902Disassembler(mem);
+							Sm83Disassembler dis = new Sm83Disassembler(mem);
 							sout.WriteLine("->" + mem.Position.ToString("x4") + ": " + dis.ReadLine());
 							sout.WriteLine("  " + mem.Position.ToString("x4") + ": " + dis.ReadLine());
 							sout.WriteLine("  " + mem.Position.ToString("x4") + ": " + dis.ReadLine());
@@ -306,7 +306,7 @@ namespace gbdbg
 						{
 							string asmline = cmd.TrimStart().Substring(2);
 							MemoryStream m = new MemoryStream();
-							Lr35902Assembler asm = new Lr35902Assembler(m);
+							Sm83Assembler asm = new Sm83Assembler(m);
 							try
 							{
 								asm.WriteLine(asmline);
@@ -414,7 +414,7 @@ namespace gbdbg
 								break;
 							}
 							System.IO.Stream mem = debugger.OpenMemory((ushort)range.Start);
-							Lr35902Disassembler dis = new Lr35902Disassembler(mem);
+							Sm83Disassembler dis = new Sm83Disassembler(mem);
 							long start = mem.Position;
 							long len = range.Length;
 							while (mem.Position <= 0xffff && mem.Position - start < len)
@@ -470,7 +470,7 @@ namespace gbdbg
 							case "asm":
 								{
 									MemoryStream m = new MemoryStream();
-									Lr35902Assembler asm = new Lr35902Assembler(m);
+									Sm83Assembler asm = new Sm83Assembler(m);
 									last_error = 0;
 									while(true)
 									{
@@ -536,7 +536,7 @@ namespace gbdbg
 										break;
 									}
 									mem.Position = range.Start;
-									Lr35902Disassembler dis = new Lr35902Disassembler(mem);
+									Sm83Disassembler dis = new Sm83Disassembler(mem);
 									long start = mem.Position;
 									long len = range.Length;
 									while (mem.Position - start < len)
@@ -812,7 +812,7 @@ namespace gbdbg
 
 			try
 			{
-				debugger = new Lr35902Debugger(args[0]);
+				debugger = new Sm83Debugger(args[0]);
 				debugger.Unlock();
 			}
 			catch (InvalidResponseException)

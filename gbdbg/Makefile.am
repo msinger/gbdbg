@@ -9,28 +9,28 @@ all: $(ASSEMBLY) $(LINUX_PKGCONFIG) $(ASSEMBLY_WRAPPER)
 FILES = \
 	AsmFormatException.cs \
 	InvalidResponseException.cs \
-	Lr35902Assembler.cs \
-	Lr35902Assembler.Addition.cs \
-	Lr35902Assembler.Argument.cs \
-	Lr35902Assembler.DataDirective.cs \
-	Lr35902Assembler.Indirection.cs \
-	Lr35902Assembler.Instruction.cs \
-	Lr35902Assembler.Label.cs \
-	Lr35902Assembler.Negation.cs \
-	Lr35902Assembler.OriginDirective.cs \
-	Lr35902Assembler.ParserToken.cs \
-	Lr35902Assembler.PostDecrement.cs \
-	Lr35902Assembler.PostIncrement.cs \
-	Lr35902Assembler.Substraction.cs \
-	Lr35902Assembler.Terminal.cs \
-	Lr35902Debugger.cs \
-	Lr35902Debugger.TargetMemoryStream.cs \
-	Lr35902Disassembler.cs \
-	Lr35902LexerBase.cs \
-	Lr35902LexerBase.LexerToken.cs \
-	Lr35902LexerBase.LexerTokenType.cs \
-	Lr35902Registers.cs \
-	Lr35902StatusFlags.cs \
+	Sm83Assembler.cs \
+	Sm83Assembler.Addition.cs \
+	Sm83Assembler.Argument.cs \
+	Sm83Assembler.DataDirective.cs \
+	Sm83Assembler.Indirection.cs \
+	Sm83Assembler.Instruction.cs \
+	Sm83Assembler.Label.cs \
+	Sm83Assembler.Negation.cs \
+	Sm83Assembler.OriginDirective.cs \
+	Sm83Assembler.ParserToken.cs \
+	Sm83Assembler.PostDecrement.cs \
+	Sm83Assembler.PostIncrement.cs \
+	Sm83Assembler.Substraction.cs \
+	Sm83Assembler.Terminal.cs \
+	Sm83Debugger.cs \
+	Sm83Debugger.TargetMemoryStream.cs \
+	Sm83Disassembler.cs \
+	Sm83LexerBase.cs \
+	Sm83LexerBase.LexerToken.cs \
+	Sm83LexerBase.LexerTokenType.cs \
+	Sm83Registers.cs \
+	Sm83StatusFlags.cs \
 	NameParser.cs \
 	NotHaltedException.cs \
 	NumberParser.cs \

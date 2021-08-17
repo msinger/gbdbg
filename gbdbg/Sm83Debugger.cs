@@ -3,10 +3,10 @@ using System.IO.Ports;
 
 namespace gbdbg
 {
-	using Regs = Lr35902Registers;
-	using F = Lr35902StatusFlags;
+	using Regs = Sm83Registers;
+	using F = Sm83StatusFlags;
 
-	public partial class Lr35902Debugger
+	public partial class Sm83Debugger
 	{
 		[Serializable]
 		[Flags]
@@ -466,7 +466,7 @@ namespace gbdbg
 			p.DiscardInBuffer();
 		}
 
-		public Lr35902Debugger(string port)
+		public Sm83Debugger(string port)
 		{
 			this.port = port;
 			OpenPort();

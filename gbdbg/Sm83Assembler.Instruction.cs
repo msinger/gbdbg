@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace gbdbg
 {
-	public partial class Lr35902Assembler
+	public partial class Sm83Assembler
 	{
 		protected class Instruction : ParserToken
 		{

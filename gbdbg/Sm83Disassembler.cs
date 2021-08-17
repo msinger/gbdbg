@@ -3,11 +3,11 @@ using System.IO;
 
 namespace gbdbg
 {
-	public class Lr35902Disassembler
+	public class Sm83Disassembler
 	{
 		private readonly BinaryReader br;
 
-		public Lr35902Disassembler(Stream input)
+		public Sm83Disassembler(Stream input)
 		{
 			br = new BinaryReader(input);
 		}

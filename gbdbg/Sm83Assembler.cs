@@ -6,29 +6,29 @@ using System.Globalization;
 
 namespace gbdbg
 {
-	public partial class Lr35902Assembler : Lr35902LexerBase
+	public partial class Sm83Assembler : Sm83LexerBase
 	{
 		private readonly BinaryWriter bw;
 
 		private ushort                      org;
 		private IDictionary<string, ushort> lbl;
 
-		public Lr35902Assembler(Stream output, ushort origin, IDictionary<string, ushort> labels)
+		public Sm83Assembler(Stream output, ushort origin, IDictionary<string, ushort> labels)
 		{
 			bw  = new BinaryWriter(output);
 			org = origin;
 			lbl = labels;
 		}
 
-		public Lr35902Assembler(Stream output, ushort origin)
+		public Sm83Assembler(Stream output, ushort origin)
 			: this(output, origin, new Dictionary<string, ushort>())
 		{ }
 
-		public Lr35902Assembler(Stream output, IDictionary<string, ushort> labels)
+		public Sm83Assembler(Stream output, IDictionary<string, ushort> labels)
 			: this(output, 0, labels)
 		{ }
 
-		public Lr35902Assembler(Stream output)
+		public Sm83Assembler(Stream output)
 			: this(output, 0)
 		{ }
 

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace gbdbg
 {
-	public abstract class NameParser : Lr35902LexerBase
+	public abstract class NameParser : Sm83LexerBase
 	{
 		public static string Parse(string str)
 		{

@@ -2,9 +2,9 @@
 
 namespace gbdbg
 {
-	using F = Lr35902StatusFlags;
+	using F = Sm83StatusFlags;
 
-	public struct Lr35902Registers
+	public struct Sm83Registers
 	{
 		public ushort PC;
 		public ushort SP;

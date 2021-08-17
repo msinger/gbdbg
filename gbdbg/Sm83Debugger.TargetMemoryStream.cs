@@ -3,14 +3,14 @@ using System.IO;
 
 namespace gbdbg
 {
-	public partial class Lr35902Debugger
+	public partial class Sm83Debugger
 	{
 		protected class TargetMemoryStream : Stream
 		{
-			private Lr35902Debugger dbg;
+			private Sm83Debugger dbg;
 			private long adr;
 
-			public TargetMemoryStream(Lr35902Debugger dbg)
+			public TargetMemoryStream(Sm83Debugger dbg)
 			{
 				this.dbg = dbg;
 			}

@@ -4,7 +4,7 @@ namespace gbdbg
 {
 	[Serializable]
 	[Flags]
-	public enum Lr35902StatusFlags : byte
+	public enum Sm83StatusFlags : byte
 	{
 		Z = 0x80,
 		N = 0x40,

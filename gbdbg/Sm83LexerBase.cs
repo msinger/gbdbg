@@ -6,9 +6,9 @@ using System.Globalization;
 
 namespace gbdbg
 {
-	public abstract partial class Lr35902LexerBase
+	public abstract partial class Sm83LexerBase
 	{
-		protected Lr35902LexerBase() { }
+		protected Sm83LexerBase() { }
 
 		protected static LinkedListNode<LexerToken> Lex(string line)
 		{

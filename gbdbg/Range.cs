@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace gbdbg
 {
-	public class Range : Lr35902LexerBase, ICloneable
+	public class Range : Sm83LexerBase, ICloneable
 	{
 		public int Start, Length;
 
