@@ -344,8 +344,10 @@ namespace gbdbg
 				{
 					switch (t.Token.Name.ToUpper())
 					{
-					case "BC": return 0x00;
-					case "DE": return 0x10;
+					case "BC":  return 0x00;
+					case "DE":  return 0x10;
+					case "HLI": return 0x20;
+					case "HLD": return 0x30;
 					}
 				}
 				return null;
@@ -374,7 +376,7 @@ namespace gbdbg
 		{
 			byte? r = TryIndRegArg16(arg);
 			if (!r.HasValue)
-				throw new AsmFormatException(arg.Pos, "One of (BC), (DE), (HL+) or (HL-) expected.");
+				throw new AsmFormatException(arg.Pos, "One of (BC), (DE), (HLI), (HLD), (HL+) or (HL-) expected.");
 			return r.Value;
 		}
 
@@ -413,7 +415,6 @@ namespace gbdbg
 
 		private static int? TryIndValArg(Argument arg, bool w16)
 		{
-			int max = w16 ? ushort.MaxValue : byte.MaxValue;
 			if (!(arg is Indirection))
 				return null;
 			Indirection ind = (Indirection)arg;
@@ -424,8 +425,17 @@ namespace gbdbg
 				if (t.Token.Type == LexerTokenType.Value)
 				{
 					int v = t.Token.Value;
-					if (v < 0 || v > max)
-						throw new AsmFormatException(t.Pos, "Value out of range $0-$" + max.ToString("x") + ".");
+					if (w16)
+					{
+						if (v < 0 || v > 0xffff)
+							throw new AsmFormatException(t.Pos, "Value out of range $0-$ffff.");
+					}
+					else
+					{
+						if (v < 0 || (v > 0xff && v < 0xff00) || v > 0xffff)
+							throw new AsmFormatException(t.Pos, "Value out of range $0-$ff or $ff00-$ffff.");
+						v &= 0xff;
+					}
 					return v;
 				}
 			}
@@ -441,10 +451,12 @@ namespace gbdbg
 				{
 					switch (t.Token.Name.ToUpper())
 					{
-					case "NZ": return 0x00;
-					case "Z":  return 0x08;
-					case "NC": return 0x10;
-					case "C":  return 0x18;
+					case "NZ":  return 0x00;
+					case "Z":   return 0x08;
+					case "LGE":
+					case "NC":  return 0x10;
+					case "LLT":
+					case "C":   return 0x18;
 					}
 				}
 			}
@@ -455,7 +467,7 @@ namespace gbdbg
 		{
 			byte? r = TryCondArg(arg);
 			if (!r.HasValue)
-				throw new AsmFormatException(arg.Pos, "One of Z, C, NZ or NC expected.");
+				throw new AsmFormatException(arg.Pos, "One of NZ, Z, NC, C, LGE or LLT expected.");
 			return r.Value;
 		}
 
@@ -464,15 +476,24 @@ namespace gbdbg
 		{
 			byte load08 = load ? (byte)0x08 : (byte)0;
 			byte load10 = load ? (byte)0x10 : (byte)0;
-			int? adr = TryIndValArg(arg, true);
-			if (adr.HasValue) // (a16)
+			int? adr = TryIndValArg(arg, false);
+			if (adr.HasValue) // (a8)
 			{
-				bw.Write(new byte[] { (byte)(0xea + load10), (byte)(adr.Value & 0xff), (byte)(adr.Value >> 8) });
+				bw.Write(new byte[] { (byte)(0xe0 + load10), (byte)adr.Value });
 				return true;
 			}
 			if (arg is Indirection) // (?)
 			{
 				Indirection ind = (Indirection)arg;
+				if (ind.Arg is Terminal) // (C?)
+				{
+					Terminal r = (Terminal)ind.Arg;
+					if (r.Token.Type == LexerTokenType.Name && r.Token.Name.ToUpper() == "C") // (C)
+					{
+						bw.Write((byte)(0xe2 + load10));
+						return true;
+					}
+				}
 				if (ind.Arg is Addition) // (? + ?)
 				{
 					Addition ad = (Addition)ind.Arg;
@@ -501,7 +522,7 @@ namespace gbdbg
 				}
 			}
 			byte? ireg16 = TryIndRegArg16(arg);
-			if (ireg16.HasValue) // (BC), (DE), (HL+) or (HL-)
+			if (ireg16.HasValue) // (BC), (DE), (HLI), (HLD), (HL+) or (HL-)
 			{
 				bw.Write((byte)(0x02 + load08 + ireg16.Value));
 				return true;
@@ -814,6 +835,46 @@ namespace gbdbg
 				}
 				throw new AsmFormatException(t.Arg[0].Pos, "SP expected.");
 
+			case "LDX":
+				CheckArgCount(t, 2, 2);
+				{
+					if (t.Arg[0] is Terminal)
+					{
+						Terminal k = (Terminal)t.Arg[0];
+						if (k.Token.Type == LexerTokenType.Name && k.Token.Name.ToUpper() == "A") // A, ?
+						{
+							if (t.Arg[1] is Indirection) // A, (?)
+							{
+								Indirection ind = (Indirection)t.Arg[1];
+								int? val = TryValArg(ind.Arg, ushort.MinValue, ushort.MaxValue);
+								if (val.HasValue) // A, (a16)
+								{
+									bw.Write(new byte[] { 0xfa, (byte)(val.Value & 0xff), (byte)(val.Value >> 8) });
+									break;
+								}
+							}
+						}
+					}
+					if (t.Arg[1] is Terminal)
+					{
+						Terminal k = (Terminal)t.Arg[1];
+						if (k.Token.Type == LexerTokenType.Name && k.Token.Name.ToUpper() == "A") // ?, A
+						{
+							if (t.Arg[0] is Indirection) // (?), A
+							{
+								Indirection ind = (Indirection)t.Arg[0];
+								int? val = TryValArg(ind.Arg, ushort.MinValue, ushort.MaxValue);
+								if (val.HasValue) // (a16), A
+								{
+									bw.Write(new byte[] { 0xea, (byte)(val.Value & 0xff), (byte)(val.Value >> 8) });
+									break;
+								}
+							}
+						}
+					}
+				}
+				throw new AsmFormatException(t.Pos, "Illegal load argument combination.");
+
 			case "PUSH":
 				neg = 0x04;
 				goto case "POP";
@@ -927,6 +988,15 @@ namespace gbdbg
 								bw.Write((byte)0xe9);
 								break;
 							}
+						}
+					}
+					if (t.Arg.Count == 1 && t.Arg[0] is Terminal)
+					{
+						Terminal k = (Terminal)t.Arg[0];
+						if (k.Token.Type == LexerTokenType.Name && k.Token.Name.ToUpper() == "HL")
+						{
+							bw.Write((byte)0xe9);
+							break;
 						}
 					}
 					Argument a0 = null;

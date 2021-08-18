@@ -78,7 +78,7 @@ buf a asm
 .org 0x200
 ld hl, 0
 ld bc, 0xa000
-ld a, (hl+)
+ld a, (hli)
 ld (bc), a
 inc bc
 bit 0, h
@@ -238,19 +238,19 @@ ld (0xff00), a
 ; Clock "manually" until right spot
 ld hl, 0xff41
 ld a, 1
-ld (hl-), a
-ld (hl+), a
-ld (hl-), a
-ld (hl+), a
-ld (hl-), a
-ld (hl+), a
-ld (hl-), a
-ld (hl+), a
-ld (hl-), a
-ld (hl+), a
-ld (hl-), a
-ld (hl+), a
-ld (hl-), a
+ld (hld), a
+ld (hli), a
+ld (hld), a
+ld (hli), a
+ld (hld), a
+ld (hli), a
+ld (hld), a
+ld (hli), a
+ld (hld), a
+ld (hli), a
+ld (hld), a
+ld (hli), a
+ld (hld), a
 
 ; Start Counter 0 again
 ld a, 1

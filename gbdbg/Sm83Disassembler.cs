@@ -90,8 +90,8 @@ namespace gbdbg
 			{
 			case 0: return "BC";
 			case 1: return "DE";
-			case 2: return "HL+";
-			case 3: return "HL-";
+			case 2: return "HLI";
+			case 3: return "HLD";
 			default: return null;
 			}
 		}
@@ -149,8 +149,8 @@ namespace gbdbg
 				case 0xc9: return "c9        RET";
 				case 0xd9: return "d9        RETI";
 				case 0xf9: return "f9        LD SP, HL";
-				case 0xe2: return "e2        LD ($ff00 + C), A";
-				case 0xf2: return "f2        LD A, ($ff00 + C)";
+				case 0xe2: return "e2        LD (C), A";
+				case 0xf2: return "f2        LD A, (C)";
 				case 0xcb: return ReadCB();
 
 				case 0x08:
@@ -174,23 +174,23 @@ namespace gbdbg
 
 				case 0xea:
 					imm0 = br.ReadByte(); imm1 = br.ReadByte();
-					return string.Format("{0:x2} {1:x2} {2:x2}  LD (${2:x2}{1:x2}), A", instr, imm0, imm1);
+					return string.Format("{0:x2} {1:x2} {2:x2}  LDX (${2:x2}{1:x2}), A", instr, imm0, imm1);
 
 				case 0xfa:
 					imm0 = br.ReadByte(); imm1 = br.ReadByte();
-					return string.Format("{0:x2} {1:x2} {2:x2}  LD A, (${2:x2}{1:x2})", instr, imm0, imm1);
+					return string.Format("{0:x2} {1:x2} {2:x2}  LDX A, (${2:x2}{1:x2})", instr, imm0, imm1);
 
 				case 0xf8:
 					imm0 = br.ReadByte();
-					return string.Format("{0:x2} {1:x2}     LD HL, SP + ${1:x2}", instr, imm0);
+					return string.Format("{0:x2} {1:x2}     LDHL SP, ${1:x2}", instr, imm0);
 
 				case 0xe0:
 					imm0 = br.ReadByte();
-					return string.Format("{0:x2} {1:x2}     LD ($ff00 + ${1:x2}), A", instr, imm0);
+					return string.Format("{0:x2} {1:x2}     LD (${1:x2}), A", instr, imm0);
 
 				case 0xf0:
 					imm0 = br.ReadByte();
-					return string.Format("{0:x2} {1:x2}     LD A, ($ff00 + ${1:x2})", instr, imm0);
+					return string.Format("{0:x2} {1:x2}     LD A, (${1:x2})", instr, imm0);
 
 				case 0xc1: case 0xd1: case 0xe1: case 0xf1:
 					return string.Format("{0:x2}        POP {1}", instr, r16pp);
@@ -219,10 +219,15 @@ namespace gbdbg
 					imm0 = br.ReadByte();
 					return string.Format("{0:x2} {1:x2}     ADD SP, ${1:x2}", instr, imm0);
 
-				case 0xc6: case 0xd6: case 0xe6: case 0xf6:
-				case 0xce: case 0xde: case 0xee: case 0xfe:
+				case 0xc6:
+				case 0xce: case 0xde:
 					imm0 = br.ReadByte();
 					return string.Format("{0:x2} {1:x2}     {2} A, ${1:x2}", instr, imm0, op);
+
+				case 0xd6: case 0xe6: case 0xf6:
+				case 0xee: case 0xfe:
+					imm0 = br.ReadByte();
+					return string.Format("{0:x2} {1:x2}     {2} ${1:x2}", instr, imm0, op);
 
 				case 0x20: case 0x30: case 0x28: case 0x38:
 					imm0 = br.ReadByte();
@@ -262,8 +267,10 @@ namespace gbdbg
 
 				if (instr >= 0x40 && instr < 0x80)
 					return string.Format("{0:x2}        LD {1}, {2}", instr, dst, src);
-				if (instr >= 0x80 && instr < 0xc0)
+				if ((instr >= 0x80 && instr < 0x90) || (instr >= 0x98 && instr < 0xa0))
 					return string.Format("{0:x2}        {1} A, {2}", instr, op, src);
+				if (instr >= 0x80 && instr < 0xc0)
+					return string.Format("{0:x2}        {1} {2}", instr, op, src);
 			}
 			catch (EndOfStreamException) { }
 
