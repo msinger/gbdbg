@@ -17,9 +17,12 @@ wr 0xff13 0
 wr 0xff43 1
 wr 0xff42 1
 
-# Set Port A Pin 0 to high, others to low
-wr 0xff40 1
-wr 0xff41 0xfe
+# Set Port A Pin 0, 6 and 7 to high, others to low
+#  0: clk out
+#  6: T1
+#  7: T2
+wr 0xff40 0xc1
+wr 0xff41 0x3e
 
 # Disable Interrupts
 wr 0xffff 0
