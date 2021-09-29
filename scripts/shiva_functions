@@ -1,0 +1,529 @@
+SYSRAM_START=$(( 0x0000 ))
+DUTRAM_START=$(( 0x1000 ))
+RECRAM_START=$(( 0x2000 ))
+SYSRAM_LEN=$(( 4096 ))
+DUTRAM_LEN=$(( 4096 ))
+RECRAM_LEN=$(( 4096 ))
+SYSRAM_END=$(( SYSRAM_START + SYSRAM_LEN - 1 ))
+DUTRAM_END=$(( DUTRAM_START + DUTRAM_LEN - 1 ))
+RECRAM_END=$(( RECRAM_START + RECRAM_LEN - 1 ))
+
+LED0=$(( 0xff00 ))
+LED1=$(( 0xff01 ))
+
+SW0=$(( 0xff02 ))
+SW1=$(( 0xff03 ))
+
+ATOM0=$(( 0xff10 ))
+ATOM1=$(( 0xff11 ))
+ATOM2=$(( 0xff12 ))
+ATOM3=$(( 0xff13 ))
+
+ONES=$(( 0xff14 ))
+
+REC_CTRL=$(( 0xff15 ))
+REC_CTRL_SET_ADR=$((  1 << 0 ))
+REC_CTRL_SET_TRIG=$(( 1 << 1 ))
+
+NUM_COUNTERS=2
+COUNTER_BASE=( $((0xff20)) $((0xff24)) )
+COUNTER_COUNT_OFFSET=0
+COUNTER_CTRL_OFFSET=0
+COUNTER_SETCMP_OFFSET=1
+COUNTER_SETIN_OFFSET=2
+COUNTER_SETOUT_OFFSET=3
+for i in ${!COUNTER_BASE[@]}; do
+	(( COUNTER_COUNT0[i] = COUNTER_BASE[i] + COUNTER_COUNT_OFFSET     ))
+	(( COUNTER_COUNT1[i] = COUNTER_BASE[i] + COUNTER_COUNT_OFFSET + 1 ))
+	(( COUNTER_COUNT2[i] = COUNTER_BASE[i] + COUNTER_COUNT_OFFSET + 2 ))
+	(( COUNTER_COUNT3[i] = COUNTER_BASE[i] + COUNTER_COUNT_OFFSET + 3 ))
+	(( COUNTER_CTRL[i]   = COUNTER_BASE[i] + COUNTER_CTRL_OFFSET      ))
+	(( COUNTER_SETCMP[i] = COUNTER_BASE[i] + COUNTER_SETCMP_OFFSET    ))
+	(( COUNTER_SETIN[i]  = COUNTER_BASE[i] + COUNTER_SETIN_OFFSET     ))
+	(( COUNTER_SETOUT[i] = COUNTER_BASE[i] + COUNTER_SETOUT_OFFSET    ))
+done
+COUNTER_CTRL_START=$((   1 << 0 ))
+COUNTER_CTRL_STOP=$((    1 << 1 ))
+COUNTER_CTRL_RESET=$((   1 << 2 ))
+COUNTER_CTRL_LOAD=$((    1 << 3 ))
+COUNTER_CTRL_COUNT=$((   1 << 4 ))
+COUNTER_CTRL_SETLOAD=$(( 1 << 7 ))
+COUNTER_SETIN_START=$((  1 << 0 ))
+COUNTER_SETIN_STOP=$((   1 << 1 ))
+COUNTER_SETIN_RESET=$((  1 << 2 ))
+COUNTER_SETIN_LOAD=$((   1 << 3 ))
+COUNTER_SETIN_COUNT=$((  1 << 4 ))
+
+PA_OUT=$((       0xff40 ))
+PA_SET=$((       0xff40 ))
+PA_IN=$((        0xff41 ))
+PA_RESET=$((     0xff41 ))
+PA_SETTRIG=$((   0xff42 ))
+PA_RESETTRIG=$(( 0xff43 ))
+
+DUT_CTRL=$((     0xff50 ))
+DUT_ADR_IN0=$((  0xff50 ))
+DUT_ADR_IN1=$((  0xff51 ))
+DUT_DATA_IN=$((  0xff52 ))
+DUT_DATA_OUT=$(( 0xff52 ))
+DUT_IN=$((       0xff53 ))
+DUT_CMP_OUT=$((  0xff51 ))
+DUT_CMP_IN=$((   0xff53 ))
+DUT_CTRL_SET_RESET=$((   1 << 0 ))
+DUT_CTRL_SET_DATA=$((    1 << 1 ))
+DUT_CTRL_RESET_RESET=$(( 1 << 2 ))
+DUT_CTRL_RESET_DATA=$((  1 << 3 ))
+DUT_CMP_OUT_MATCH0=$((   1 << 0 ))
+DUT_CMP_OUT_MATCH1=$((   1 << 1 ))
+DUT_CMP_OUT_MATCH2=$((   1 << 2 ))
+DUT_CMP_OUT_MATCH3=$((   1 << 3 ))
+DUT_CMP_OUT_EDGE0=$((    1 << 4 ))
+DUT_CMP_OUT_EDGE1=$((    1 << 5 ))
+DUT_CMP_OUT_EDGE2=$((    1 << 6 ))
+DUT_CMP_OUT_EDGE3=$((    1 << 7 ))
+DUT_CMP_IN_VAL0=$((      1 << 0 ))
+DUT_CMP_IN_VAL1=$((      1 << 1 ))
+DUT_CMP_IN_VAL2=$((      1 << 2 ))
+DUT_CMP_IN_VAL3=$((      1 << 3 ))
+DUT_CMP_IN_MASK0=$((     1 << 4 ))
+DUT_CMP_IN_MASK1=$((     1 << 5 ))
+DUT_CMP_IN_MASK2=$((     1 << 6 ))
+DUT_CMP_IN_MASK3=$((     1 << 7 ))
+
+IFLAG=$(( 0xfffe ))
+IEN=$((   0xffff ))
+
+CGB_INCOMPATIBLE=
+CGB_COMPATIBLE=$'\x80'
+CGB_EXCLUSIVE=$'\xc0'
+
+SGB_INCOMPATIBLE=
+SGB_COMPATIBLE=$'\x03'
+
+CART_TYPE_ROM_ONLY=
+CART_TYPE_MBC1=$'\x01'
+CART_TYPE_MBC1_SRAM=$'\x02'
+CART_TYPE_MBC1_SRAM_BAT=$'\x03'
+CART_TYPE_MBC2=$'\x05'
+CART_TYPE_MBC2_BAT=$'\x06'
+CART_TYPE_ROM_SRAM=$'\x08'
+CART_TYPE_ROM_SRAM_BAT=$'\x09'
+CART_TYPE_MMM01=$'\x0b'
+CART_TYPE_MMM01_SRAM=$'\x0c'
+CART_TYPE_MMM01_SRAM_BAT=$'\x0d'
+CART_TYPE_MBC3_RTC_BAT=$'\x0f'
+CART_TYPE_MBC3_RTC_SRAM_BAT=$'\x10'
+CART_TYPE_MBC3=$'\x11'
+CART_TYPE_MBC3_SRAM=$'\x12'
+CART_TYPE_MBC3_SRAM_BAT=$'\x13'
+CART_TYPE_MBC5=$'\x19'
+CART_TYPE_MBC5_SRAM=$'\x1a'
+CART_TYPE_MBC5_SRAM_BAT=$'\x1b'
+CART_TYPE_MBC5_RUMBLE=$'\x1c'
+CART_TYPE_MBC5_RUMBLE_SRAM=$'\x1d'
+CART_TYPE_MBC5_RUMBLE_SRAM_BAT=$'\x1e'
+CART_TYPE_MBC6=$'\x20'
+CART_TYPE_MBC7=$'\x22'
+CART_TYPE_CAMERA=$'\xfc'
+CART_TYPE_TAMA5=$'\xfd'
+CART_TYPE_HUC3=$'\xfe'
+CART_TYPE_HUC1=$'\xff'
+
+ROM_SIZE_32K=
+ROM_SIZE_64K=$'\x01'
+ROM_SIZE_128K=$'\x02'
+ROM_SIZE_256K=$'\x03'
+ROM_SIZE_512K=$'\x04'
+ROM_SIZE_1M=$'\x05'
+ROM_SIZE_2M=$'\x06'
+ROM_SIZE_4M=$'\x07'
+ROM_SIZE_8M=$'\x08'
+ROM_SIZE_1M1=$'\x52'
+ROM_SIZE_1M2=$'\x53'
+ROM_SIZE_1M5=$'\x54'
+
+RAM_SIZE_0=
+RAM_SIZE_2K=$'\x01'
+RAM_SIZE_8K=$'\x02'
+RAM_SIZE_32K=$'\x03'
+RAM_SIZE_128K=$'\x04'
+RAM_SIZE_64K=$'\x05'
+
+DEST_CODE_JAPAN=
+DEST_CODE_OTHER=$'\x01'
+
+OLD_LICENSE_DEFAULT=$'\x33'
+
+function run () {
+	gbdbg "$DEV" < <(
+		if [ $# -eq 0 ]; then
+			set -- -
+		fi
+		used_stdin=
+		while [ $# -ne 0 ]; do
+			if [ "$1" == - ] && [ -z "$used_stdin" ]; then
+				echo
+				cat
+				echo
+				used_stdin=y
+			else
+				echo "$1"
+			fi
+			shift
+		done
+	)
+}
+
+function led () {
+	local l=0
+	local h=0
+	if [ $# -eq 1 ]; then
+		run "wr $LED0 $(($1 & 0xff))" "wr $LED1 $((($1 >> 8) & 0xff))"
+	elif [ $# -eq 2 ]; then
+		if [ "$1" == s ]; then
+			led 0xffff $((1 << $2))
+		elif [ "$1" == r ]; then
+			led 0 $((1 << $2))
+		else
+			if ((($2 & 0xff) != 0 && ($2 & 0xff) != 0xff)); then
+				l=$(run "rd $LED0") || return $?
+			fi
+			if ((($2 & 0xff00) != 0 && ($2 & 0xff00) != 0xff00)); then
+				h=$(run "rd $LED1") || return $?
+			fi
+			(( l = (l & ~($2        & 0xff)) | ($1        & 0xff & $2)        ))
+			(( h = (h & ~(($2 >> 8) & 0xff)) | (($1 >> 8) & 0xff & ($2 >> 8)) ))
+			if ((($2 & 0xff) != 0)); then
+				if ((($2 & 0xff00) != 0)); then
+					run "wr $LED0 $l" "wr $LED0 $h"
+				else
+					run "wr $LED0 $l"
+				fi
+			elif ((($2 & 0xff00) != 0)); then
+				run "wr $LED1 $h"
+			fi
+		fi
+	else
+		return 1
+	fi
+}
+
+function gen_set_atom () {
+	echo "
+		wr $ATOM0 $(($1 & 0xff))
+		wr $ATOM1 $((($1 >> 8) & 0xff))
+		wr $ATOM2 $((($1 >> 16) & 0xff))
+		wr $ATOM3 $((($1 >> 24) & 0xff))
+	"
+}
+
+function sum_args () {
+	local sum=0
+	while (($# > 0)); do
+		((sum += $1))
+		shift
+	done
+	echo $sum
+}
+
+function calc_hdr_check_sum () {
+	local sum=$(sum_args $* 0x19)
+	echo $((-sum & 0xff))
+}
+
+function gen_hdr () {
+	# Args:
+	#  1: game title
+	#  2: game code
+	#  3: CGB support code
+	#  4: new license code
+	#  5: SGB support code
+	#  6: cartridge type
+	#  7: ROM size
+	#  8: RAM size
+	#  9: destination code
+	# 10: old license code
+	# 11: ROM version
+
+	local fld_len=( 11 4 1 2 1 1 1 1 1 1 1 )
+	if (($# != ${#fld_len[*]})); then
+		return 1
+	fi
+
+	local hdr=()
+	local i
+	for ((i = 0; i < ${#fld_len[*]}; i++)); do
+		hdr+=( $( { echo -n "$1"; cat /dev/zero; } | od -vAn -tu1 -N${fld_len[i]}) )
+		shift
+	done
+
+	local chksum=$(calc_hdr_check_sum ${hdr[*]})
+	hdr+=( $chksum 0 0 )
+
+	echo "
+		# Place Nintendo logo
+		buf a asm
+			.db 0xCE 0xED 0x66 0x66 0xCC 0x0D 0x00 0x0B 0x03 0x73 0x00 0x83 0x00 0x0C 0x00 0x0D
+			.db 0x00 0x08 0x11 0x1F 0x88 0x89 0x00 0x0E 0xDC 0xCC 0x6E 0xE6 0xDD 0xDD 0xD9 0x99
+			.db 0xBB 0xBB 0x67 0x63 0x6E 0x0E 0xEC 0xCC 0xDD 0xDC 0x99 0x9F 0xBB 0xB9 0x33 0x3E
+		end
+		buf a store $((DUTRAM_START + 0x104))+48
+
+		# Place header fields
+		buf a asm
+			.db ${hdr[*]}
+		end
+		buf a store $((DUTRAM_START + 0x134))+28
+	"
+}
+
+function gen_default_hdr () {
+	local title=${1-TEST}
+	gen_hdr "$title" TEST "$CGB_INCOMPATIBLE" ZZ "$SGB_INCOMPATIBLE" "$CART_TYPE_ROM_ONLY" \
+	        "$ROM_SIZE_32K" "$RAM_SIZE_0" "$DEST_CODE_OTHER" "$OLD_LICENSE_DEFAULT" ""
+}
+
+function place_code () {(
+	set -e
+	local adr=$1
+	local dump=$(run < <(
+		echo buf a asm
+		cat
+		echo end
+		echo buf a store $((adr))
+		echo buf a dump
+	))
+	local elements=( $(echo "$dump" | sed -e '
+		/:.*|.*|/!d
+		s/^.*:\(.*\)|.*|.*$/\1/
+	') )
+	echo ${#elements[*]}
+)}
+
+function sys_code () {(
+	set -e
+	local adr=$1
+	place_code $((adr + SYSRAM_START))
+)}
+
+function dut_code () {(
+	set -e
+	local adr=$1
+	place_code $((adr + DUTRAM_START))
+)}
+
+function init () {(
+	set -e
+	run h || return $?
+	led 0
+	run >/dev/null < <(
+		# Disconnect routes to Port A Pin 0 trigger inputs to make sure DUT gets no clock
+		gen_set_atom 0
+		echo "
+			wr $PA_RESETTRIG 1
+			wr $PA_SETTRIG   1
+		"
+
+		echo "
+			# Set Port A Pin 0, 6 and 7 to high, others to low
+			#  0: clk out
+			#  6: T1
+			#  7: T2
+			wr $PA_SET   0xc1
+			wr $PA_RESET 0x3e
+
+			# Disable Interrupts
+			wr $IEN 0
+
+			# Zero out DUT RAM
+			wr $DUTRAM_START-$DUTRAM_END 0
+
+			# Place jump for safety at the end of DUT RAM
+			buf a asm
+				jr -2
+			end
+			buf a store $((DUTRAM_END - 1))+2
+
+			# Place jump at DUT entry point
+			buf a asm
+				nop
+				jr -2
+			end
+			buf a store $((DUTRAM_START + 0x100))+3
+		"
+
+		gen_default_hdr
+
+		# Disconnect always one source
+		echo wr $ONES 0
+
+		# Reset counters
+		for ((i = 0; i < NUM_COUNTERS; i++)); do
+			echo wr ${COUNTER_SETIN[i]}  0xff
+			echo wr ${COUNTER_SETOUT[i]} 0xff
+			echo wr ${COUNTER_CTRL[i]}   $((COUNTER_CTRL_STOP | COUNTER_CTRL_RESET))
+		done
+
+		echo "
+			# Reset DUT and DUT connector
+			wr $DUT_CMP_OUT 0xff
+			wr $DUT_CTRL    $((DUT_CTRL_RESET_DATA | DUT_CTRL_SET_RESET))
+
+			# Reset interrupts flags
+			wr $IFLAG 0
+
+			# Deassert DUT reset
+			wr $DUT_CTRL $DUT_CTRL_RESET_RESET
+		"
+	)
+)}
+
+function set_routes () {(
+	set -e
+	local reg=$1
+	local val=$2
+	shift 2
+	local sum=0
+	while (($# > 0)); do
+		((sum |= (1 << $1)))
+		shift
+	done
+	run >/dev/null < <(
+		gen_set_atom $sum
+		echo wr $reg $val
+	)
+)}
+
+function set_always_one () {
+	set_routes $ONES 0 $*
+}
+
+function set_counter_count () {
+	local counter=$1
+	shift
+	set_routes ${COUNTER_SETIN[counter]} $COUNTER_SETIN_COUNT $*
+}
+
+function set_counter_load () {
+	local counter=$1
+	shift
+	set_routes ${COUNTER_SETIN[counter]} $COUNTER_SETIN_LOAD $*
+}
+
+function set_counter_reset () {
+	local counter=$1
+	shift
+	set_routes ${COUNTER_SETIN[counter]} $COUNTER_SETIN_RESET $*
+}
+
+function set_counter_stop () {
+	local counter=$1
+	shift
+	set_routes ${COUNTER_SETIN[counter]} $COUNTER_SETIN_STOP $*
+}
+
+function set_counter_start () {
+	local counter=$1
+	shift
+	set_routes ${COUNTER_SETIN[counter]} $COUNTER_SETIN_START $*
+}
+
+function set_counter_match () {
+	local counter=$1
+	local comparator=$2
+	shift 2
+	set_routes ${COUNTER_SETOUT[counter]} $((1 << comparator)) $*
+}
+
+function set_counter_comparator () {(
+	set -e
+	local counter=$1
+	local comparator=$2
+	local value=$3
+	run >/dev/null < <(
+		gen_set_atom $value
+		echo wr ${COUNTER_SETCMP[counter]} $((1 << comparator))
+	)
+)}
+
+function set_counter_load () {(
+	set -e
+	local counter=$1
+	local value=$2
+	run >/dev/null < <(
+		gen_set_atom $value
+		echo wr ${COUNTER_CTRL[counter]} $COUNTER_CTRL_SETLOAD
+	)
+)}
+
+function count () {
+	local counter=$1
+	run "wr ${COUNTER_CTRL[counter]} $COUNTER_CTRL_COUNT" >/dev/null
+}
+
+function reload_counter () {
+	local counter=$1
+	run "wr ${COUNTER_CTRL[counter]} $COUNTER_CTRL_LOAD" >/dev/null
+}
+
+function reset_counter () {
+	local counter=$1
+	run "wr ${COUNTER_CTRL[counter]} $COUNTER_CTRL_RESET" >/dev/null
+}
+
+function stop_counter () {
+	local counter=$1
+	run "wr ${COUNTER_CTRL[counter]} $COUNTER_CTRL_STOP" >/dev/null
+}
+
+function start_counter () {
+	local counter=$1
+	run "wr ${COUNTER_CTRL[counter]} $COUNTER_CTRL_START" >/dev/null
+}
+
+function set_porta_set () {
+	local pin=$1
+	shift
+	set_routes $PA_SETTRIG $((1 << pin)) $*
+}
+
+function set_porta_reset () {
+	local pin=$1
+	shift
+	set_routes $PA_RESETTRIG $((1 << pin)) $*
+}
+
+function set_porta () {
+	local mask=$1
+	run "wr $PA_SET $mask" >/dev/null
+}
+
+function reset_porta () {
+	local mask=$1
+	run "wr $PA_RESET $mask" >/dev/null
+}
+
+function set_dut_comparator () {(
+	set -e
+	local comparator=$1
+	local value=$2
+	local mask=$3
+	run >/dev/null < <(
+		gen_set_atom $value
+		echo wr $DUT_CMP_IN $((1 << comparator))
+		gen_set_atom $mask
+		echo wr $DUT_CMP_IN $((1 << (comparator + 4)))
+	)
+)}
+
+function set_dut_match () {
+	local comparator=$1
+	shift
+	set_routes $DUT_CMP_OUT $((1 << comparator)) $*
+}
+
+function set_dut_match_edge () {
+	local comparator=$1
+	shift
+	set_routes $DUT_CMP_OUT $((1 << (comparator + 4))) $*
+}
