@@ -95,7 +95,8 @@ set_dut_comparator 0 $((0x0400814c)) $((0x0000ffff))
 set_dut_match    0 2
 set_counter_stop 0 2
 
-len=$(sys_code $((0x100)) <<EOF
+echo Booting DUT... >&2
+sys_run $((0x100)) 7 <<EOF
 	.org 0x100
 
 	; LED
@@ -144,30 +145,13 @@ len=$(sys_code $((0x100)) <<EOF
 
 	; Start Counter 0 again
 	$(sysgen_start_counter 0)
-
-	jr -2
 EOF
-)
-
-run "set pc 0x100"
-
-# Set breakpoint on "jr -2" instruction at the end
-set_breakpoint 0 $((0x100 + len - 2))
-
-echo Booting DUT... >&2
-run c
-
-echo Waiting for trigger... >&2
-wait_for_halt 7
-run h
-set_breakpoint 0
 
 echo 'Overclocked "INC HL" instruction.' >&2
 
 echo Waiting for dump... >&2
 timeout=5
 while true; do
-	sleep 1
 	if ((timeout > 0)); then
 		((timeout--))
 	fi
@@ -186,6 +170,7 @@ while true; do
 		break
 	fi
 	if ((timeout != 0)); then
+		sleep 1
 		continue
 	fi
 	echo Timeout! >&2

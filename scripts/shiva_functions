@@ -947,7 +947,6 @@ function wait_for_halt () {(
 	fi
 	local timeout=${1--1}
 	while true; do
-		sleep 1
 		if ((timeout > 0)); then
 			((timeout--))
 		fi
@@ -955,6 +954,7 @@ function wait_for_halt () {(
 		run r >/dev/null 2>&1 || res=$?
 		if ((res == 6)); then
 			if ((timeout != 0)); then
+				sleep 1
 				continue
 			fi
 			echo Timeout! >&2
@@ -983,3 +983,28 @@ function asmgen_string () {(
 	local chars=( $(echo -n "$str" | od -vAn -tx1 | sed -e 's,\([0-9a-zA-Z][0-9a-zA-Z]\),0x\1,g') )
 	echo .db ${chars[*]}
 )}
+
+function sys_run () {(
+	set -e
+	if (($# != 1 && $# != 2)); then
+		return 1
+	fi
+	local adr=$1
+	local timeout=${2--1}
+
+	run h
+
+	local len=$( (cat; echo; echo "jr -2") | sys_code $adr)
+
+	run "set pc $adr"
+
+	# Set breakpoint on "jr -2" instruction at the end
+	set_breakpoint 0 $((adr + len - 2))
+
+	run c
+
+	wait_for_halt $timeout
+	run h
+	set_breakpoint 0
+)}
+
