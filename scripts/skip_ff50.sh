@@ -74,19 +74,17 @@ set_dut_comparator 0 $((0x0400814c)) $((0x0000ffff))
 set_dut_match    0 2
 set_counter_stop 0 2
 
-sys_code $((0x100)) <<"EOF"
+sys_code $((0x100)) <<EOF
 	.org 0x100
 
 	; LED
-	ld a, 2
-	ld (0xff00), a
+	$(sysgen_led 2)
 
 	; Start Counter 0
-	ld a, 1
-	ld (0xff20), a
+	$(sysgen_start_counter 0)
 
 	; Wait for match
-	ld hl, 0xfffe
+	ld hl, $IFLAG
 	ld a, (hl)
 	bit 2, a
 	jr z, -5
@@ -98,55 +96,33 @@ sys_code $((0x100)) <<"EOF"
 	; below would be unnecessary, but it doesn't hurt either.
 
 	; LED
-	ld a, 3
-	ld (0xff00), a
+	$(sysgen_led 3)
 
 	; Disconnect route 2 on both ends
-	xor a, a
-	ld (0xff10), a
-	inc a
-	ld (0xff51), a
-	inc a
-	ld (0xff22), a
+	$(sysgen_set_dut_match 0)
+	$(sysgen_set_counter_stop 0)
 
 	; Load 15 to counter 0
-	ld a, 15
-	ld (0xff10), a
-	ld a, 0x80
-	ld (0xff20), a
-	ld a, 8
-	ld (0xff20), a
+	$(sysgen_set_counter_load 0 15)
+	$(sysgen_reload_counter 0)
 
 	; Use Route 1&2 to set Port A Pin 0
-	ld a, 6
-	ld (0xff10), a
-	ld a, 1
-	ld (0xff42), a
+	$(sysgen_set_porta_set 0 1 2)
 
 	; LED
-	ld a, 4
-	ld (0xff00), a
+	$(sysgen_led 4)
 
 	; Clock "manually" until right spot
-	ld hl, 0xff41
-	ld a, 1
-	ld (hld), a
-	ld (hli), a
-	ld (hld), a
-	ld (hli), a
-	ld (hld), a
-	ld (hli), a
-	ld (hld), a
-	ld (hli), a
-	ld (hld), a
-	ld (hli), a
-	ld (hld), a
-	ld (hli), a
-	ld (hld), a
+	$(
+		sysgen_reset_porta $((0x01))
+		for ((i = 0; i < 6; i++)); do
+			sysgen_set_porta   $((0x01))
+			sysgen_reset_porta $((0x01))
+		done
+	)
 
 	; Start Counter 0 again
-	ld a, 1
-	ld (0xff20), a
+	$(sysgen_start_counter 0)
 
 	jr -2
 EOF
