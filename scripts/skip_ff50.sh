@@ -6,14 +6,32 @@ set -e
 
 DEV=${DEV:-/dev/ttyUSB1}
 
-echo Initialize...
+DISASSEMBLE=
+BINARYOUT=
+if [ "$1" == -d ]; then
+	DISASSEMBLE=y
+fi
+if [ "$1" == -b ]; then
+	BINARYOUT=y
+fi
+
+echo Initialize... >&2
 init
 
 led 1
 
+cur_date=$(date -u +'%F %T.%N%z')
+
+# Add string of current date at DUT 0x400
+dut_code $((0x400)) >/dev/null <<EOF
+	$(asmgen_string $cur_date)
+EOF
+
 # DUT code that dumps bootrom
-dut_code $((0x200)) >/dev/null <<"EOF"
+dut_code $((0x200)) >/dev/null <<EOF
 	.org 0x200
+
+	; Dump 0x0000-0x00ff to 0xa000
 	ld hl, 0
 	ld bc, 0xa000
 	ld a, (hli)
@@ -21,22 +39,23 @@ dut_code $((0x200)) >/dev/null <<"EOF"
 	inc bc
 	bit 0, h
 	jr z, -7
+
+	; Copy date string to 0xa100
+	ld hl, 0x0400
+	ld bc, 0xa100
+	ld a, (hli)
+	ld (bc), a
+	inc bc
+	bit 0, h
+	jr z, -7
+
+	; Loop here
 	jr -2
 EOF
 
-# Add some patterns to DUT 0x0000-0x00ff
-run <<EOF
-	wr $(($DUTRAM_START + 0x00)) 0xc7
-	wr $(($DUTRAM_START + 0x08)) 0xcf
-	wr $(($DUTRAM_START + 0x10)) 0xd7
-	wr $(($DUTRAM_START + 0x18)) 0xdf
-	wr $(($DUTRAM_START + 0x20)) 0xe7
-	wr $(($DUTRAM_START + 0x28)) 0xef
-	wr $(($DUTRAM_START + 0x30)) 0xf7
-	wr $(($DUTRAM_START + 0x38)) 0xff
-	wr $(($DUTRAM_START + 0xfd)) 0xc7
-	wr $(($DUTRAM_START + 0xfe)) 0x55
-	wr $(($DUTRAM_START + 0xff)) 0xaa
+# Add some patterns to DUT 0x0000
+dut_code 0 >/dev/null <<"EOF"
+	.db 0xde 0xad 0xc0 0xde
 EOF
 
 # Make route 3 always one
@@ -76,7 +95,7 @@ set_dut_comparator 0 $((0x0400814c)) $((0x0000ffff))
 set_dut_match    0 2
 set_counter_stop 0 2
 
-sys_code $((0x100)) >/dev/null <<EOF
+len=$(sys_code $((0x100)) <<EOF
 	.org 0x100
 
 	; LED
@@ -128,9 +147,62 @@ sys_code $((0x100)) >/dev/null <<EOF
 
 	jr -2
 EOF
+)
 
 run "set pc 0x100"
 
-echo Boot DUT...
+# Set breakpoint on "jr -2" instruction at the end
+set_breakpoint 0 $((0x100 + len - 2))
+
+echo Booting DUT... >&2
 run c
+
+echo Waiting for trigger... >&2
+wait_for_halt 7
+run h
+set_breakpoint 0
+
+echo 'Overclocked "INC HL" instruction.' >&2
+
+echo Waiting for dump... >&2
+timeout=5
+while true; do
+	sleep 1
+	if ((timeout > 0)); then
+		((timeout--))
+	fi
+	dump=$(run "dump $((DUTRAM_START + 0x100))+${#cur_date}" 2>/dev/null)
+	str=$(echo "$dump" | sed -e '
+		/:[^|]*|.*|/!d
+		s/^[^|]*:[^|]*|\(.*\)|[^|]*$/\1/
+	' | sed -e '
+		:next
+		N
+		$! b next
+		s,\n,,g
+	')
+	if [ "$cur_date" == "$str" ]; then
+		echo Dump complete. >&2
+		break
+	fi
+	if ((timeout != 0)); then
+		continue
+	fi
+	echo Timeout! >&2
+	exit 1
+done
+
+echo Receiving dump... >&2
+if [ -n "$BINARYOUT" ]; then
+	dump=$(run "dump $DUTRAM_START+256" 2>/dev/null)
+	elements=( $(echo "$dump" | sed -e '
+		/:[^|]*|.*|/!d
+		s/^[^|]*:\([^|]*\)|.*|[^|]*$/\1/
+	') )
+	echo "${elements[*]}" | xxd -r -ps
+elif [ -n "$DISASSEMBLE" ]; then
+	run "dis $DUTRAM_START+256" 2>/dev/null
+else
+	run "dump $DUTRAM_START+256" 2>/dev/null
+fi
 

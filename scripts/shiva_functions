@@ -8,6 +8,8 @@ SYSRAM_END=$(( SYSRAM_START + SYSRAM_LEN - 1 ))
 DUTRAM_END=$(( DUTRAM_START + DUTRAM_LEN - 1 ))
 RECRAM_END=$(( RECRAM_START + RECRAM_LEN - 1 ))
 
+NUM_BREAKPOINTS=4
+
 LED0=$(( 0xff00 ))
 LED1=$(( 0xff01 ))
 
@@ -367,8 +369,8 @@ function place_code () {(
 		echo buf a dump
 	))
 	local elements=( $(echo "$dump" | sed -e '
-		/:.*|.*|/!d
-		s/^.*:\(.*\)|.*|.*$/\1/
+		/:[^|]*|.*|/!d
+		s/^[^|]*:\([^|]*\)|.*|[^|]*$/\1/
 	') )
 	echo ${#elements[*]}
 )}
@@ -391,6 +393,18 @@ function dut_code () {(
 	place_code $((adr + DUTRAM_START))
 )}
 
+function disable_all_breakpoints () {(
+	set -e
+	if (($# != 0)); then
+		return 1
+	fi
+	run < <(
+		for ((i = 0; i < NUM_BREAKPOINTS; i++)); do
+			echo "b $i 0xffff"
+		done
+	)
+)}
+
 function init () {(
 	set -e
 	if (($# != 0)); then
@@ -398,6 +412,7 @@ function init () {(
 	fi
 	run h || return $?
 	led 0
+	disable_all_breakpoints
 	run >/dev/null 2>&1 < <(
 		# Disconnect routes to Port A Pin 0 trigger inputs to make sure DUT gets no clock
 		gen_set_atom 0
@@ -925,3 +940,46 @@ function sysgen_set_dut_match_edge () {
 	shift
 	sysgen_set_routes $DUT_CMP_OUT $((1 << (comparator + 4))) $*
 }
+
+function wait_for_halt () {(
+	if (($# > 1)); then
+		return 1
+	fi
+	local timeout=${1--1}
+	while true; do
+		sleep 1
+		if ((timeout > 0)); then
+			((timeout--))
+		fi
+		local res=0
+		run r >/dev/null 2>&1 || res=$?
+		if ((res == 6)); then
+			if ((timeout != 0)); then
+				continue
+			fi
+			echo Timeout! >&2
+			return $res
+		elif ((res != 0)); then
+			echo Target error $res >&2
+			return $res
+		fi
+		break
+	done
+)}
+
+function set_breakpoint () {(
+	set -e
+	if (($# != 1 && $# != 2)); then
+		return 1
+	fi
+	local idx=$1
+	local adr=${2-$((0xffff))}
+	run "b $idx $adr"
+)}
+
+function asmgen_string () {(
+	set -e
+	local str=$*
+	local chars=( $(echo -n "$str" | od -vAn -tx1 | sed -e 's,\([0-9a-zA-Z][0-9a-zA-Z]\),0x\1,g') )
+	echo .db ${chars[*]}
+)}
