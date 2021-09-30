@@ -2,6 +2,8 @@
 
 . $(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null && pwd)/shiva_functions
 
+set -e
+
 DEV=${DEV:-/dev/ttyUSB1}
 
 echo Initialize...
@@ -10,7 +12,7 @@ init
 led 1
 
 # DUT code that dumps bootrom
-dut_code $((0x200)) <<"EOF"
+dut_code $((0x200)) >/dev/null <<"EOF"
 	.org 0x200
 	ld hl, 0
 	ld bc, 0xa000
@@ -74,7 +76,7 @@ set_dut_comparator 0 $((0x0400814c)) $((0x0000ffff))
 set_dut_match    0 2
 set_counter_stop 0 2
 
-sys_code $((0x100)) <<EOF
+sys_code $((0x100)) >/dev/null <<EOF
 	.org 0x100
 
 	; LED
@@ -128,5 +130,7 @@ sys_code $((0x100)) <<EOF
 EOF
 
 run "set pc 0x100"
+
+echo Boot DUT...
 run c
 

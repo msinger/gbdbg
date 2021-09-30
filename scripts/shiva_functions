@@ -257,6 +257,9 @@ function sysgen_led () {
 }
 
 function gen_set_atom () {
+	if (($# != 1 || $1 < 0 || $1 > 0xffffffff)); then
+		return 1
+	fi
 	echo "
 		wr $ATOM0 $(($1 & 0xff))
 		wr $ATOM1 $((($1 >> 8) & 0xff))
@@ -266,6 +269,9 @@ function gen_set_atom () {
 }
 
 function sysgen_set_atom () {
+	if (($# != 1 || $1 < 0 || $1 > 0xffffffff)); then
+		return 1
+	fi
 	echo "
 		ld a, $(($1 & 0xff))
 		ld ($ATOM0), a
@@ -339,6 +345,9 @@ function gen_hdr () {
 }
 
 function gen_default_hdr () {
+	if (($# > 1)); then
+		return 1
+	fi
 	local title=${1-TEST}
 	gen_hdr "$title" TEST "$CGB_INCOMPATIBLE" ZZ "$SGB_INCOMPATIBLE" "$CART_TYPE_ROM_ONLY" \
 	        "$ROM_SIZE_32K" "$RAM_SIZE_0" "$DEST_CODE_OTHER" "$OLD_LICENSE_DEFAULT" ""
@@ -346,8 +355,11 @@ function gen_default_hdr () {
 
 function place_code () {(
 	set -e
+	if (($# != 1)); then
+		return 1
+	fi
 	local adr=$1
-	local dump=$(run < <(
+	local dump=$(run 2>/dev/null < <(
 		echo buf a asm
 		cat
 		echo end
@@ -363,21 +375,30 @@ function place_code () {(
 
 function sys_code () {(
 	set -e
+	if (($# != 1)); then
+		return 1
+	fi
 	local adr=$1
 	place_code $((adr + SYSRAM_START))
 )}
 
 function dut_code () {(
 	set -e
+	if (($# != 1)); then
+		return 1
+	fi
 	local adr=$1
 	place_code $((adr + DUTRAM_START))
 )}
 
 function init () {(
 	set -e
+	if (($# != 0)); then
+		return 1
+	fi
 	run h || return $?
 	led 0
-	run >/dev/null < <(
+	run >/dev/null 2>&1 < <(
 		# Disconnect routes to Port A Pin 0 trigger inputs to make sure DUT gets no clock
 		gen_set_atom 0
 		echo "
@@ -441,8 +462,17 @@ function init () {(
 
 function set_routes () {(
 	set -e
+	if (($# < 2)); then
+		return 1
+	fi
 	local reg=$1
 	local val=$2
+	if ((reg < 0xff00 || reg > 0xffff)); then
+		return 1
+	fi
+	if ((val < 0 || val > 0xffff)); then
+		return 1
+	fi
 	shift 2
 	local sum=0
 	while (($# > 0)); do
@@ -457,8 +487,17 @@ function set_routes () {(
 
 function sysgen_set_routes () {(
 	set -e
+	if (($# < 2)); then
+		return 1
+	fi
 	local reg=$1
 	local val=$2
+	if ((reg < 0xff00 || reg > 0xffff)); then
+		return 1
+	fi
+	if ((val < 0 || val > 0xffff)); then
+		return 1
+	fi
 	shift 2
 	local sum=0
 	while (($# > 0)); do
@@ -481,66 +520,99 @@ function sysgen_set_always_one () {
 }
 
 function set_counter_count () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local counter=$1
 	shift
 	set_routes ${COUNTER_SETIN[counter]} $COUNTER_SETIN_COUNT $*
 }
 
 function sysgen_set_counter_count () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local counter=$1
 	shift
 	sysgen_set_routes ${COUNTER_SETIN[counter]} $COUNTER_SETIN_COUNT $*
 }
 
 function set_counter_load () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local counter=$1
 	shift
 	set_routes ${COUNTER_SETIN[counter]} $COUNTER_SETIN_LOAD $*
 }
 
 function sysgen_set_counter_load () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local counter=$1
 	shift
 	sysgen_set_routes ${COUNTER_SETIN[counter]} $COUNTER_SETIN_LOAD $*
 }
 
 function set_counter_reset () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local counter=$1
 	shift
 	set_routes ${COUNTER_SETIN[counter]} $COUNTER_SETIN_RESET $*
 }
 
 function sysgen_set_counter_reset () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local counter=$1
 	shift
 	sysgen_set_routes ${COUNTER_SETIN[counter]} $COUNTER_SETIN_RESET $*
 }
 
 function set_counter_stop () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local counter=$1
 	shift
 	set_routes ${COUNTER_SETIN[counter]} $COUNTER_SETIN_STOP $*
 }
 
 function sysgen_set_counter_stop () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local counter=$1
 	shift
 	sysgen_set_routes ${COUNTER_SETIN[counter]} $COUNTER_SETIN_STOP $*
 }
 
 function set_counter_start () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local counter=$1
 	shift
 	set_routes ${COUNTER_SETIN[counter]} $COUNTER_SETIN_START $*
 }
 
 function sysgen_set_counter_start () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local counter=$1
 	shift
 	sysgen_set_routes ${COUNTER_SETIN[counter]} $COUNTER_SETIN_START $*
 }
 
 function set_counter_match () {
+	if (($# < 2)); then
+		return 1
+	fi
 	local counter=$1
 	local comparator=$2
 	shift 2
@@ -548,6 +620,9 @@ function set_counter_match () {
 }
 
 function sysgen_set_counter_match () {
+	if (($# < 2)); then
+		return 1
+	fi
 	local counter=$1
 	local comparator=$2
 	shift 2
@@ -556,6 +631,9 @@ function sysgen_set_counter_match () {
 
 function set_counter_comparator () {(
 	set -e
+	if (($# != 3)); then
+		return 1
+	fi
 	local counter=$1
 	local comparator=$2
 	local value=$3
@@ -567,6 +645,9 @@ function set_counter_comparator () {(
 
 function sysgen_set_counter_comparator () {(
 	set -e
+	if (($# != 3)); then
+		return 1
+	fi
 	local counter=$1
 	local comparator=$2
 	local value=$3
@@ -579,6 +660,9 @@ function sysgen_set_counter_comparator () {(
 
 function set_counter_load () {(
 	set -e
+	if (($# != 2)); then
+		return 1
+	fi
 	local counter=$1
 	local value=$2
 	run >/dev/null < <(
@@ -589,6 +673,9 @@ function set_counter_load () {(
 
 function sysgen_set_counter_load () {(
 	set -e
+	if (($# != 2)); then
+		return 1
+	fi
 	local counter=$1
 	local value=$2
 	sysgen_set_atom $value
@@ -599,11 +686,17 @@ function sysgen_set_counter_load () {(
 )}
 
 function count () {
+	if (($# != 1)); then
+		return 1
+	fi
 	local counter=$1
 	run "wr ${COUNTER_CTRL[counter]} $COUNTER_CTRL_COUNT" >/dev/null
 }
 
 function sysgen_count () {
+	if (($# != 1)); then
+		return 1
+	fi
 	local counter=$1
 	echo "
 		ld a, $COUNTER_CTRL_COUNT
@@ -612,11 +705,17 @@ function sysgen_count () {
 }
 
 function reload_counter () {
+	if (($# != 1)); then
+		return 1
+	fi
 	local counter=$1
 	run "wr ${COUNTER_CTRL[counter]} $COUNTER_CTRL_LOAD" >/dev/null
 }
 
 function sysgen_reload_counter () {
+	if (($# != 1)); then
+		return 1
+	fi
 	local counter=$1
 	echo "
 		ld a, $COUNTER_CTRL_LOAD
@@ -625,11 +724,17 @@ function sysgen_reload_counter () {
 }
 
 function reset_counter () {
+	if (($# != 1)); then
+		return 1
+	fi
 	local counter=$1
 	run "wr ${COUNTER_CTRL[counter]} $COUNTER_CTRL_RESET" >/dev/null
 }
 
 function sysgen_reset_counter () {
+	if (($# != 1)); then
+		return 1
+	fi
 	local counter=$1
 	echo "
 		ld a, $COUNTER_CTRL_RESET
@@ -638,11 +743,17 @@ function sysgen_reset_counter () {
 }
 
 function stop_counter () {
+	if (($# != 1)); then
+		return 1
+	fi
 	local counter=$1
 	run "wr ${COUNTER_CTRL[counter]} $COUNTER_CTRL_STOP" >/dev/null
 }
 
 function sysgen_stop_counter () {
+	if (($# != 1)); then
+		return 1
+	fi
 	local counter=$1
 	echo "
 		ld a, $COUNTER_CTRL_STOP
@@ -651,11 +762,17 @@ function sysgen_stop_counter () {
 }
 
 function start_counter () {
+	if (($# != 1)); then
+		return 1
+	fi
 	local counter=$1
 	run "wr ${COUNTER_CTRL[counter]} $COUNTER_CTRL_START" >/dev/null
 }
 
 function sysgen_start_counter () {
+	if (($# != 1)); then
+		return 1
+	fi
 	local counter=$1
 	echo "
 		ld a, $COUNTER_CTRL_START
@@ -664,35 +781,53 @@ function sysgen_start_counter () {
 }
 
 function set_porta_set () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local pin=$1
 	shift
 	set_routes $PA_SETTRIG $((1 << pin)) $*
 }
 
 function sysgen_set_porta_set () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local pin=$1
 	shift
 	sysgen_set_routes $PA_SETTRIG $((1 << pin)) $*
 }
 
 function set_porta_reset () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local pin=$1
 	shift
 	set_routes $PA_RESETTRIG $((1 << pin)) $*
 }
 
 function sysgen_set_porta_reset () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local pin=$1
 	shift
 	sysgen_set_routes $PA_RESETTRIG $((1 << pin)) $*
 }
 
 function set_porta () {
+	if (($# != 1)); then
+		return 1
+	fi
 	local mask=$1
 	run "wr $PA_SET $mask" >/dev/null
 }
 
 function sysgen_set_porta () {
+	if (($# != 1)); then
+		return 1
+	fi
 	local mask=$1
 	echo "
 		ld a, $mask
@@ -701,11 +836,17 @@ function sysgen_set_porta () {
 }
 
 function reset_porta () {
+	if (($# != 1)); then
+		return 1
+	fi
 	local mask=$1
 	run "wr $PA_RESET $mask" >/dev/null
 }
 
 function sysgen_reset_porta () {
+	if (($# != 1)); then
+		return 1
+	fi
 	local mask=$1
 	echo "
 		ld a, $mask
@@ -715,6 +856,9 @@ function sysgen_reset_porta () {
 
 function set_dut_comparator () {(
 	set -e
+	if (($# != 3)); then
+		return 1
+	fi
 	local comparator=$1
 	local value=$2
 	local mask=$3
@@ -728,6 +872,9 @@ function set_dut_comparator () {(
 
 function sysgen_set_dut_comparator () {(
 	set -e
+	if (($# != 3)); then
+		return 1
+	fi
 	local comparator=$1
 	local value=$2
 	local mask=$3
@@ -744,24 +891,36 @@ function sysgen_set_dut_comparator () {(
 )}
 
 function set_dut_match () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local comparator=$1
 	shift
 	set_routes $DUT_CMP_OUT $((1 << comparator)) $*
 }
 
 function sysgen_set_dut_match () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local comparator=$1
 	shift
 	sysgen_set_routes $DUT_CMP_OUT $((1 << comparator)) $*
 }
 
 function set_dut_match_edge () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local comparator=$1
 	shift
 	set_routes $DUT_CMP_OUT $((1 << (comparator + 4))) $*
 }
 
 function sysgen_set_dut_match_edge () {
+	if (($# < 1)); then
+		return 1
+	fi
 	local comparator=$1
 	shift
 	sysgen_set_routes $DUT_CMP_OUT $((1 << (comparator + 4))) $*
