@@ -474,6 +474,17 @@ namespace gbdbg
 			return r.Value;
 		}
 
+		private static string TryLabelArg(Argument arg)
+		{
+			if (arg is Terminal)
+			{
+				Terminal t = (Terminal)arg;
+				if (t.Token.Type == LexerTokenType.Name)
+					return t.Token.Name;
+			}
+			return null;
+		}
+
 		// Handles special cases of "LD A, ?" and "LD ?, A"
 		private bool HandleLdA(Argument arg, bool load)
 		{
@@ -967,13 +978,18 @@ namespace gbdbg
 						a0 = t.Arg[0];
 						a1 = t.Arg[1];
 					}
-					byte adr = unchecked((byte)ValArg(a1, sbyte.MinValue, sbyte.MaxValue));
 					if (a0 == null)
-					{
-						Enqueue(new byte[] { 0x18, adr });
-						break;
-					}
-					Enqueue(new byte[] { (byte)(0x20 | CondArg(a0)), adr });
+						Enqueue((byte)0x18);
+					else
+						Enqueue((byte)(0x20 | CondArg(a0)));
+					int? adr = TryValArg(a1, sbyte.MinValue, sbyte.MaxValue);
+					string l = TryLabelArg(a1);
+					if (adr.HasValue)
+						Enqueue((byte)adr.Value);
+					else if (l != null)
+						EnqueueRel8(l, (ushort)(org + 1));
+					else
+						throw new AsmFormatException(a1.Pos, "Label or relative address expected.");
 					break;
 				}
 
@@ -1009,13 +1025,18 @@ namespace gbdbg
 						a0 = t.Arg[0];
 						a1 = t.Arg[1];
 					}
-					ushort adr = (ushort)ValArg(a1, ushort.MinValue, ushort.MaxValue);
 					if (a0 == null)
-					{
-						Enqueue(new byte[] { 0xc3, (byte)(adr & 0xff), (byte)(adr >> 8) });
-						break;
-					}
-					Enqueue(new byte[] { (byte)(0xc2 | CondArg(a0)), (byte)(adr & 0xff), (byte)(adr >> 8) });
+						Enqueue((byte)0xc3);
+					else
+						Enqueue((byte)(0xc2 | CondArg(a0)));
+					int? adr = TryValArg(a1, ushort.MinValue, ushort.MaxValue);
+					string l = TryLabelArg(a1);
+					if (adr.HasValue)
+						Enqueue(new byte[] { (byte)(adr.Value & 0xff), (byte)(adr.Value >> 8) });
+					else if (l != null)
+						EnqueueAbs16(l);
+					else
+						throw new AsmFormatException(a1.Pos, "(HL), label or absolute address expected.");
 					break;
 				}
 
@@ -1029,13 +1050,18 @@ namespace gbdbg
 						a0 = t.Arg[0];
 						a1 = t.Arg[1];
 					}
-					ushort adr = (ushort)ValArg(a1, ushort.MinValue, ushort.MaxValue);
 					if (a0 == null)
-					{
-						Enqueue(new byte[] { 0xcd, (byte)(adr & 0xff), (byte)(adr >> 8) });
-						break;
-					}
-					Enqueue(new byte[] { (byte)(0xc4 | CondArg(a0)), (byte)(adr & 0xff), (byte)(adr >> 8) });
+						Enqueue((byte)0xcd);
+					else
+						Enqueue((byte)(0xc4 | CondArg(a0)));
+					int? adr = TryValArg(a1, ushort.MinValue, ushort.MaxValue);
+					string l = TryLabelArg(a1);
+					if (adr.HasValue)
+						Enqueue(new byte[] { (byte)(adr.Value & 0xff), (byte)(adr.Value >> 8) });
+					else if (l != null)
+						EnqueueAbs16(l);
+					else
+						throw new AsmFormatException(a1.Pos, "Label or absolute address expected.");
 					break;
 				}
 

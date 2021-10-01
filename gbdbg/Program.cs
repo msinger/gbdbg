@@ -472,7 +472,7 @@ namespace gbdbg
 									MemoryStream m = new MemoryStream();
 									Sm83Assembler asm = new Sm83Assembler(m);
 									last_error = 0;
-									while(true)
+									while (true)
 									{
 										if (interactive)
 											sout.Write("> ");
@@ -489,7 +489,7 @@ namespace gbdbg
 										{
 											asm.WriteLine(asmline);
 										}
-										catch(AsmFormatException e)
+										catch (AsmFormatException e)
 										{
 											eout.WriteLine(e.Message);
 											eout.WriteLine("> " + asmline);
@@ -508,7 +508,28 @@ namespace gbdbg
 									}
 									if (last_error == 0)
 									{
-										asm.Flush();
+										try
+										{
+											asm.Flush();
+										}
+										catch (LabelNotFoundException e)
+										{
+											eout.WriteLine(e.Message);
+											last_error = 3;
+											break;
+										}
+										catch (LabelTooFarException e)
+										{
+											eout.WriteLine(e.Message);
+											last_error = 3;
+											break;
+										}
+										catch
+										{
+											eout.WriteLine("Failed to assemble block");
+											last_error = 3;
+											break;
+										}
 										buffers[buf] = m;
 									}
 								}
