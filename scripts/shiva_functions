@@ -381,7 +381,7 @@ function sys_code () {(
 		return 1
 	fi
 	local adr=$1
-	place_code $((adr + SYSRAM_START))
+	(echo ".org $adr"; cat) | place_code $((adr + SYSRAM_START))
 )}
 
 function dut_code () {(
@@ -390,7 +390,7 @@ function dut_code () {(
 		return 1
 	fi
 	local adr=$1
-	place_code $((adr + DUTRAM_START))
+	(echo ".org $adr"; cat) | place_code $((adr + DUTRAM_START))
 )}
 
 function disable_all_breakpoints () {(

@@ -29,8 +29,6 @@ EOF
 
 # DUT code that dumps bootrom
 dut_code $((0x200)) >/dev/null <<EOF
-	.org 0x200
-
 	; Dump 0x0000-0x00ff to 0xa000
 	ld hl, 0
 	ld bc, 0xa000
@@ -99,8 +97,6 @@ set_counter_stop 0 2
 
 echo Booting DUT... >&2
 sys_run $((0x100)) 7 <<EOF
-	.org 0x100
-
 	; LED
 	$(sysgen_led 2)
 
