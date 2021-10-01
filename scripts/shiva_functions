@@ -417,11 +417,9 @@ function init () {(
 		# Disconnect routes to Port A Pin 0 trigger inputs to make sure DUT gets no clock
 		gen_set_atom 0
 		echo "
-			wr $PA_RESETTRIG 1
-			wr $PA_SETTRIG   1
-		"
+			wr $PA_RESETTRIG 0xff
+			wr $PA_SETTRIG   0xff
 
-		echo "
 			# Set Port A Pin 0, 6 and 7 to high, others to low
 			#  0: clk out
 			#  6: T1
@@ -431,6 +429,9 @@ function init () {(
 
 			# Disable Interrupts
 			wr $IEN 0
+
+			# Reset stack pointer
+			set sp 0xfffe
 
 			# Zero out DUT RAM
 			wr $DUTRAM_START-$DUTRAM_END 0
@@ -994,7 +995,7 @@ function sys_run () {(
 
 	run h
 
-	local len=$( (cat; echo; echo "jr -2") | sys_code $adr)
+	local len=$( (cat; echo; echo nop; echo "jr -2") | sys_code $adr)
 
 	run "set pc $adr"
 
@@ -1003,8 +1004,10 @@ function sys_run () {(
 
 	run c
 
-	wait_for_halt $timeout
+	local res=0
+	wait_for_halt $timeout || res=$?
 	run h
 	set_breakpoint 0
+	return $res
 )}
 
