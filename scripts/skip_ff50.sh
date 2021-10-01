@@ -34,20 +34,22 @@ dut_code $((0x200)) >/dev/null <<EOF
 	; Dump 0x0000-0x00ff to 0xa000
 	ld hl, 0
 	ld bc, 0xa000
+loop1:
 	ld a, (hli)
 	ld (bc), a
 	inc bc
 	bit 0, h
-	jr z, -7
+	jr z, loop1
 
 	; Copy date string to 0xa100
 	ld hl, 0x0400
 	ld bc, 0xa100
+loop2:
 	ld a, (hli)
 	ld (bc), a
 	inc bc
 	bit 0, h
-	jr z, -7
+	jr z, loop2
 
 	; Loop here
 	jr -2
@@ -107,9 +109,10 @@ sys_run $((0x100)) 7 <<EOF
 
 	; Wait for match
 	ld hl, $IFLAG
+loop:
 	ld a, (hl)
 	bit 2, a
-	jr z, -5
+	jr z, loop
 
 	; If there is no delay in the comparator signal, then the clock
 	; output line (bit 0 in 0xff40) should be high at this point.
