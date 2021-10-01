@@ -9,6 +9,8 @@ all: $(ASSEMBLY) $(LINUX_PKGCONFIG) $(ASSEMBLY_WRAPPER)
 FILES = \
 	AsmFormatException.cs \
 	InvalidResponseException.cs \
+	LabelNotFoundException.cs \
+	LabelTooFarException.cs \
 	Sm83Assembler.cs \
 	Sm83Assembler.Addition.cs \
 	Sm83Assembler.Argument.cs \
@@ -21,6 +23,8 @@ FILES = \
 	Sm83Assembler.ParserToken.cs \
 	Sm83Assembler.PostDecrement.cs \
 	Sm83Assembler.PostIncrement.cs \
+	Sm83Assembler.Reloc.cs \
+	Sm83Assembler.RelocType.cs \
 	Sm83Assembler.Substraction.cs \
 	Sm83Assembler.Terminal.cs \
 	Sm83Debugger.cs \

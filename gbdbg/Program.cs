@@ -507,7 +507,10 @@ namespace gbdbg
 										}
 									}
 									if (last_error == 0)
+									{
+										asm.Flush();
 										buffers[buf] = m;
+									}
 								}
 								break;
 							case "dis":

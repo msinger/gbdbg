@@ -8,6 +8,8 @@ namespace gbdbg
 {
 	public partial class Sm83Assembler : Sm83LexerBase
 	{
+		private readonly Queue<object> fifo;
+
 		private readonly BinaryWriter bw;
 
 		private ushort                      org;
@@ -15,9 +17,10 @@ namespace gbdbg
 
 		public Sm83Assembler(Stream output, ushort origin, IDictionary<string, ushort> labels)
 		{
-			bw  = new BinaryWriter(output);
-			org = origin;
-			lbl = labels;
+			fifo = new Queue<object>();
+			bw   = new BinaryWriter(output);
+			org  = origin;
+			lbl  = labels;
 		}
 
 		public Sm83Assembler(Stream output, ushort origin)
@@ -479,7 +482,7 @@ namespace gbdbg
 			int? adr = TryIndValArg(arg, false);
 			if (adr.HasValue) // (a8)
 			{
-				bw.Write(new byte[] { (byte)(0xe0 + load10), (byte)adr.Value });
+				Enqueue(new byte[] { (byte)(0xe0 + load10), (byte)adr.Value });
 				return true;
 			}
 			if (arg is Indirection) // (?)
@@ -490,7 +493,7 @@ namespace gbdbg
 					Terminal r = (Terminal)ind.Arg;
 					if (r.Token.Type == LexerTokenType.Name && r.Token.Name.ToUpper() == "C") // (C)
 					{
-						bw.Write((byte)(0xe2 + load10));
+						Enqueue((byte)(0xe2 + load10));
 						return true;
 					}
 				}
@@ -505,7 +508,7 @@ namespace gbdbg
 							int? adr8 = TryValArg(ad.RightOp, 0, 0xff);
 							if (adr8.HasValue) // ($ff00 + a8)
 							{
-								bw.Write(new byte[] { (byte)(0xe0 + load10), (byte)adr8.Value });
+								Enqueue(new byte[] { (byte)(0xe0 + load10), (byte)adr8.Value });
 								return true;
 							}
 							if (ad.RightOp is Terminal)
@@ -513,7 +516,7 @@ namespace gbdbg
 								Terminal r = (Terminal)ad.RightOp;
 								if (r.Token.Type == LexerTokenType.Name && r.Token.Name.ToUpper() == "C") // ($ff00 + C)
 								{
-									bw.Write((byte)(0xe2 + load10));
+									Enqueue((byte)(0xe2 + load10));
 									return true;
 								}
 							}
@@ -524,7 +527,7 @@ namespace gbdbg
 			byte? ireg16 = TryIndRegArg16(arg);
 			if (ireg16.HasValue) // (BC), (DE), (HLI), (HLD), (HL+) or (HL-)
 			{
-				bw.Write((byte)(0x02 + load08 + ireg16.Value));
+				Enqueue((byte)(0x02 + load08 + ireg16.Value));
 				return true;
 			}
 			return false;
@@ -577,7 +580,7 @@ namespace gbdbg
 			case "DAA":  case "CPL":
 			case "SCF":  case "CCF":
 				CheckArgCount(t, 0, 0);
-				bw.Write(op0[n]);
+				Enqueue(op0[n]);
 				break;
 
 			case "RLC":  case "RRC":
@@ -585,14 +588,14 @@ namespace gbdbg
 			case "SLA":  case "SRA":
 			case "SWAP": case "SRL":
 				CheckArgCount(t, 1, 1);
-				bw.Write(new byte[] { 0xcb, (byte)(cb1[n] | RegArg(t.Arg[0])) });
+				Enqueue(new byte[] { 0xcb, (byte)(cb1[n] | RegArg(t.Arg[0])) });
 				break;
 
 			case "BIT":
 			case "RES":
 			case "SET":
 				CheckArgCount(t, 2, 2);
-				bw.Write(new byte[] { 0xcb, (byte)(cb2[n] | (ValArg(t.Arg[0], 0, 7) << 3) | RegArg(t.Arg[1])) });
+				Enqueue(new byte[] { 0xcb, (byte)(cb2[n] | (ValArg(t.Arg[0], 0, 7) << 3) | RegArg(t.Arg[1])) });
 				break;
 
 			case "LD":
@@ -613,7 +616,7 @@ namespace gbdbg
 								Terminal l = (Terminal)t.Arg[1];
 								if (l.Token.Type == LexerTokenType.Name && l.Token.Name.ToUpper() == "SP") // HL, SP
 								{
-									bw.Write(new byte[] { 0xf8, 0x00 });
+									Enqueue(new byte[] { 0xf8, 0x00 });
 									break;
 								}
 							}
@@ -628,7 +631,7 @@ namespace gbdbg
 										int? rel8 = TryValArg(ad.RightOp, sbyte.MinValue, sbyte.MaxValue);
 										if (rel8.HasValue) // HL, SP + r8
 										{
-											bw.Write(new byte[] { 0xf8, unchecked((byte)rel8.Value) });
+											Enqueue(new byte[] { 0xf8, unchecked((byte)rel8.Value) });
 											break;
 										}
 									}
@@ -645,7 +648,7 @@ namespace gbdbg
 										int? rel8 = TryValArg(su.RightOp, -sbyte.MaxValue, -sbyte.MinValue);
 										if (rel8.HasValue) // HL, SP - r8
 										{
-											bw.Write(new byte[] { 0xf8, unchecked((byte)-rel8.Value) });
+											Enqueue(new byte[] { 0xf8, unchecked((byte)-rel8.Value) });
 											break;
 										}
 									}
@@ -659,7 +662,7 @@ namespace gbdbg
 								Terminal l = (Terminal)t.Arg[1];
 								if (l.Token.Type == LexerTokenType.Name && l.Token.Name.ToUpper() == "HL") // SP, HL
 								{
-									bw.Write((byte)0xf9);
+									Enqueue((byte)0xf9);
 									break;
 								}
 							}
@@ -678,7 +681,7 @@ namespace gbdbg
 							int? adr = TryIndValArg(t.Arg[0], true);
 							if (adr.HasValue) // (a16), SP
 							{
-								bw.Write(new byte[] { 0x08, (byte)(adr.Value & 0xff), (byte)(adr.Value >> 8) });
+								Enqueue(new byte[] { 0x08, (byte)(adr.Value & 0xff), (byte)(adr.Value >> 8) });
 								break;
 							}
 						}
@@ -691,13 +694,13 @@ namespace gbdbg
 						{
 							if (a0reg.Value == 6 && a1reg.Value == 6) // (HL), (HL)
 								throw new AsmFormatException(t.Pos, "Illegal load indirect to indirect.");
-							bw.Write((byte)(0x40 | (a0reg.Value << 3) | a1reg.Value));
+							Enqueue((byte)(0x40 | (a0reg.Value << 3) | a1reg.Value));
 							break;
 						}
 						int? a1val = TryValArg(t.Arg[1], byte.MinValue, byte.MaxValue);
 						if (a1val.HasValue) // { A, B, C, D, E, H, L, (HL) }, d8
 						{
-							bw.Write(new byte[] { (byte)(0x06 | (a0reg.Value << 3)), (byte)a1val.Value });
+							Enqueue(new byte[] { (byte)(0x06 | (a0reg.Value << 3)), (byte)a1val.Value });
 							break;
 						}
 					}
@@ -707,7 +710,7 @@ namespace gbdbg
 						int? a1val = TryValArg(t.Arg[1], ushort.MinValue, ushort.MaxValue);
 						if (a1val.HasValue) // { BC, DE, HL, SP }, d16
 						{
-							bw.Write(new byte[] { (byte)(0x01 | a0reg.Value), (byte)(a1val.Value & 0xff), (byte)(a1val.Value >> 8) });
+							Enqueue(new byte[] { (byte)(0x01 | a0reg.Value), (byte)(a1val.Value & 0xff), (byte)(a1val.Value >> 8) });
 							break;
 						}
 					}
@@ -728,7 +731,7 @@ namespace gbdbg
 								int? val = TryValArg(ind.Arg, byte.MinValue, byte.MaxValue);
 								if (val.HasValue) // A, (a8)
 								{
-									bw.Write(new byte[] { 0xf0, (byte)val.Value });
+									Enqueue(new byte[] { 0xf0, (byte)val.Value });
 									break;
 								}
 								if (ind.Arg is Terminal)
@@ -736,7 +739,7 @@ namespace gbdbg
 									Terminal l = (Terminal)ind.Arg;
 									if (l.Token.Type == LexerTokenType.Name && l.Token.Name.ToUpper() == "C") // A, (C)
 									{
-										bw.Write((byte)0xf2);
+										Enqueue((byte)0xf2);
 										break;
 									}
 								}
@@ -754,7 +757,7 @@ namespace gbdbg
 								int? val = TryValArg(ind.Arg, byte.MinValue, byte.MaxValue);
 								if (val.HasValue) // (a8), A
 								{
-									bw.Write(new byte[] { 0xe0, (byte)val.Value });
+									Enqueue(new byte[] { 0xe0, (byte)val.Value });
 									break;
 								}
 								if (ind.Arg is Terminal)
@@ -762,7 +765,7 @@ namespace gbdbg
 									Terminal l = (Terminal)ind.Arg;
 									if (l.Token.Type == LexerTokenType.Name && l.Token.Name.ToUpper() == "C") // (C), A
 									{
-										bw.Write((byte)0xe2);
+										Enqueue((byte)0xe2);
 										break;
 									}
 								}
@@ -791,7 +794,7 @@ namespace gbdbg
 									Terminal l = (Terminal)ind.Arg;
 									if (l.Token.Type == LexerTokenType.Name && l.Token.Name.ToUpper() == "HL") // A, (HL)
 									{
-										bw.Write((byte)(0x2a | neg));
+										Enqueue((byte)(0x2a | neg));
 										break;
 									}
 								}
@@ -811,7 +814,7 @@ namespace gbdbg
 									Terminal l = (Terminal)ind.Arg;
 									if (l.Token.Type == LexerTokenType.Name && l.Token.Name.ToUpper() == "HL") // (HL), A
 									{
-										bw.Write((byte)(0x22 | neg));
+										Enqueue((byte)(0x22 | neg));
 										break;
 									}
 								}
@@ -829,7 +832,7 @@ namespace gbdbg
 					Terminal k = (Terminal)t.Arg[0];
 					if (k.Token.Type == LexerTokenType.Name && k.Token.Name.ToUpper() == "SP")
 					{
-						bw.Write(new byte[] { 0xf8, unchecked((byte)ValArg(t.Arg[1], sbyte.MinValue, sbyte.MaxValue)) });
+						Enqueue(new byte[] { 0xf8, unchecked((byte)ValArg(t.Arg[1], sbyte.MinValue, sbyte.MaxValue)) });
 						break;
 					}
 				}
@@ -849,7 +852,7 @@ namespace gbdbg
 								int? val = TryValArg(ind.Arg, ushort.MinValue, ushort.MaxValue);
 								if (val.HasValue) // A, (a16)
 								{
-									bw.Write(new byte[] { 0xfa, (byte)(val.Value & 0xff), (byte)(val.Value >> 8) });
+									Enqueue(new byte[] { 0xfa, (byte)(val.Value & 0xff), (byte)(val.Value >> 8) });
 									break;
 								}
 							}
@@ -866,7 +869,7 @@ namespace gbdbg
 								int? val = TryValArg(ind.Arg, ushort.MinValue, ushort.MaxValue);
 								if (val.HasValue) // (a16), A
 								{
-									bw.Write(new byte[] { 0xea, (byte)(val.Value & 0xff), (byte)(val.Value >> 8) });
+									Enqueue(new byte[] { 0xea, (byte)(val.Value & 0xff), (byte)(val.Value >> 8) });
 									break;
 								}
 							}
@@ -880,7 +883,7 @@ namespace gbdbg
 				goto case "POP";
 			case "POP":
 				CheckArgCount(t, 1, 1);
-				bw.Write((byte)(0xc1 | neg | RegArg16PP(t.Arg[0])));
+				Enqueue((byte)(0xc1 | neg | RegArg16PP(t.Arg[0])));
 				break;
 
 			case "ADD":  case "ADC":
@@ -894,12 +897,12 @@ namespace gbdbg
 						Terminal k = (Terminal)t.Arg[0];
 						if (k.Token.Type == LexerTokenType.Name && k.Token.Name.ToUpper() == "SP")
 						{
-							bw.Write(new byte[] { 0xe8, unchecked((byte)ValArg(t.Arg[1], sbyte.MinValue, sbyte.MaxValue)) });
+							Enqueue(new byte[] { 0xe8, unchecked((byte)ValArg(t.Arg[1], sbyte.MinValue, sbyte.MaxValue)) });
 							break;
 						}
 						if (k.Token.Type == LexerTokenType.Name && k.Token.Name.ToUpper() == "HL")
 						{
-							bw.Write((byte)(0x09 | RegArg16(t.Arg[1])));
+							Enqueue((byte)(0x09 | RegArg16(t.Arg[1])));
 							break;
 						}
 					}
@@ -918,13 +921,13 @@ namespace gbdbg
 							byte? a1reg = TryRegArg(a1);
 							if (a1reg.HasValue)
 							{
-								bw.Write((byte)(0x80 | AluOp(n) | a1reg.Value));
+								Enqueue((byte)(0x80 | AluOp(n) | a1reg.Value));
 								break;
 							}
 							int? a1val = TryValArg(a1, byte.MinValue, byte.MaxValue);
 							if (a1val.HasValue)
 							{
-								bw.Write(new byte[] { (byte)(0xc6 | AluOp(n)), (byte)a1val.Value });
+								Enqueue(new byte[] { (byte)(0xc6 | AluOp(n)), (byte)a1val.Value });
 								break;
 							}
 						}
@@ -941,14 +944,14 @@ namespace gbdbg
 					byte? a0reg = TryRegArg(t.Arg[0]);
 					if (a0reg.HasValue)
 					{
-						bw.Write((byte)(0x04 | neg | (a0reg.Value << 3)));
+						Enqueue((byte)(0x04 | neg | (a0reg.Value << 3)));
 						break;
 					}
 					neg <<= 3;
 					a0reg = TryRegArg16(t.Arg[0]);
 					if (a0reg.HasValue)
 					{
-						bw.Write((byte)(0x03 | neg | a0reg.Value));
+						Enqueue((byte)(0x03 | neg | a0reg.Value));
 						break;
 					}
 				}
@@ -967,10 +970,10 @@ namespace gbdbg
 					byte adr = unchecked((byte)ValArg(a1, sbyte.MinValue, sbyte.MaxValue));
 					if (a0 == null)
 					{
-						bw.Write(new byte[] { 0x18, adr });
+						Enqueue(new byte[] { 0x18, adr });
 						break;
 					}
-					bw.Write(new byte[] { (byte)(0x20 | CondArg(a0)), adr });
+					Enqueue(new byte[] { (byte)(0x20 | CondArg(a0)), adr });
 					break;
 				}
 
@@ -985,7 +988,7 @@ namespace gbdbg
 							Terminal k = (Terminal)ind.Arg;
 							if (k.Token.Type == LexerTokenType.Name && k.Token.Name.ToUpper() == "HL")
 							{
-								bw.Write((byte)0xe9);
+								Enqueue((byte)0xe9);
 								break;
 							}
 						}
@@ -995,7 +998,7 @@ namespace gbdbg
 						Terminal k = (Terminal)t.Arg[0];
 						if (k.Token.Type == LexerTokenType.Name && k.Token.Name.ToUpper() == "HL")
 						{
-							bw.Write((byte)0xe9);
+							Enqueue((byte)0xe9);
 							break;
 						}
 					}
@@ -1009,10 +1012,10 @@ namespace gbdbg
 					ushort adr = (ushort)ValArg(a1, ushort.MinValue, ushort.MaxValue);
 					if (a0 == null)
 					{
-						bw.Write(new byte[] { 0xc3, (byte)(adr & 0xff), (byte)(adr >> 8) });
+						Enqueue(new byte[] { 0xc3, (byte)(adr & 0xff), (byte)(adr >> 8) });
 						break;
 					}
-					bw.Write(new byte[] { (byte)(0xc2 | CondArg(a0)), (byte)(adr & 0xff), (byte)(adr >> 8) });
+					Enqueue(new byte[] { (byte)(0xc2 | CondArg(a0)), (byte)(adr & 0xff), (byte)(adr >> 8) });
 					break;
 				}
 
@@ -1029,10 +1032,10 @@ namespace gbdbg
 					ushort adr = (ushort)ValArg(a1, ushort.MinValue, ushort.MaxValue);
 					if (a0 == null)
 					{
-						bw.Write(new byte[] { 0xcd, (byte)(adr & 0xff), (byte)(adr >> 8) });
+						Enqueue(new byte[] { 0xcd, (byte)(adr & 0xff), (byte)(adr >> 8) });
 						break;
 					}
-					bw.Write(new byte[] { (byte)(0xc4 | CondArg(a0)), (byte)(adr & 0xff), (byte)(adr >> 8) });
+					Enqueue(new byte[] { (byte)(0xc4 | CondArg(a0)), (byte)(adr & 0xff), (byte)(adr >> 8) });
 					break;
 				}
 
@@ -1040,10 +1043,10 @@ namespace gbdbg
 				CheckArgCount(t, 0, 1);
 				if (t.Arg.Count == 0)
 				{
-					bw.Write((byte)0xc9);
+					Enqueue((byte)0xc9);
 					break;
 				}
-				bw.Write((byte)(0xc0 | CondArg(t.Arg[0])));
+				Enqueue((byte)(0xc0 | CondArg(t.Arg[0])));
 				break;
 
 			case "RST":
@@ -1056,7 +1059,7 @@ namespace gbdbg
 						int adr = k.Token.Value;
 						if ((adr & ~0x38) == 0)
 						{
-							bw.Write((byte)(0xc7 | adr));
+							Enqueue((byte)(0xc7 | adr));
 							break;
 						}
 					}
@@ -1087,8 +1090,7 @@ namespace gbdbg
 					{
 						if (lt.Value < byte.MinValue || lt.Value > byte.MaxValue)
 							throw new AsmFormatException(lt.Pos, "Data byte out of range.");
-						bw.Write((byte)lt.Value);
-						unchecked(org)++;
+						Enqueue((byte)lt.Value);
 					}
 				}
 
@@ -1108,6 +1110,76 @@ namespace gbdbg
 
 				else throw new AsmFormatException(t.Pos, "Unknown parser token.");
 			}
+		}
+
+		public void Flush()
+		{
+			while (fifo.Count > 0)
+			{
+				object o = fifo.Dequeue();
+				if (o is Reloc)
+				{
+					Reloc r = (Reloc)o;
+					ushort adr;
+					byte rel;
+					if (!lbl.TryGetValue(r.Name, out adr))
+						throw new LabelNotFoundException(r.Name);
+					switch (r.Type)
+					{
+					case RelocType.AbsoluteAddress16:
+						bw.Write(new byte[] { (byte)(adr & 0xff), (byte)(adr >> 8) });
+						break;
+					case RelocType.AbsoluteAddress8:
+						bw.Write((byte)(adr & 0xff));
+						break;
+					case RelocType.RelativeAddress8:
+						rel = unchecked((byte)(adr - r.RefAdr));
+						if (unchecked((r.RefAdr + (sbyte)rel) & 0xffff) != adr)
+							throw new LabelTooFarException(r.Name);
+						bw.Write(rel);
+						break;
+					default:
+						throw new Exception("This shouldn't happen.");
+					}
+				}
+				else
+				{
+					bw.Write((byte[])o);
+				}
+			}
+		}
+
+		private void Enqueue(byte[] b)
+		{
+			if (b.Length == 0)
+				return;
+			fifo.Enqueue(b);
+			org = (ushort)(org + b.Length);
+		}
+
+		private void Enqueue(byte b)
+		{
+			fifo.Enqueue(new byte[] { b });
+			unchecked(org)++;
+		}
+
+		private void EnqueueAbs16(string name)
+		{
+			fifo.Enqueue(new Reloc(name, RelocType.AbsoluteAddress16));
+			unchecked(org)++;
+			unchecked(org)++;
+		}
+
+		private void EnqueueAbs8(string name)
+		{
+			fifo.Enqueue(new Reloc(name, RelocType.AbsoluteAddress8));
+			unchecked(org)++;
+		}
+
+		private void EnqueueRel8(string name, ushort refAdr)
+		{
+			fifo.Enqueue(new Reloc(name, refAdr));
+			unchecked(org)++;
 		}
 	}
 }
