@@ -410,13 +410,17 @@ function init () {(
 	if (($# != 0)); then
 		return 1
 	fi
+
 	run h || return $?
-	led 0
 	disable_all_breakpoints
+	run "x di"
+	led 0
+
 	run >/dev/null 2>&1 < <(
-		# Disconnect routes to Port A Pin 0 trigger inputs to make sure DUT gets no clock
 		gen_set_atom 0
+
 		echo "
+			# Disconnect routes to Port A Pin 0 trigger inputs to make sure DUT gets no clock
 			wr $PA_RESETTRIG 0xff
 			wr $PA_SETTRIG   0xff
 
@@ -431,11 +435,29 @@ function init () {(
 			wr $IEN 0
 
 			# Reset stack pointer
-			set sp 0xfffe
+			set sp $((SYSRAM_START + SYSRAM_LEN))
+		"
+	)
 
-			# Zero out DUT RAM
-			wr $DUTRAM_START-$DUTRAM_END 0
+	sys_run $((0x100)) 2 < <(echo "
+		; Zero out lower 256 bytes
+		xor a
+		ld hl, 0
+	loop1:
+		ld (hli), a
+		bit 0, h
+		jr z, loop1
 
+		; Zero out DUT RAM
+		ld hl, $DUTRAM_START
+	loop2:
+		ld (hli), a
+		bit 5, h  ; expects end of DUT RAM to be 0x1fff
+		jr z, loop2
+	")
+
+	run >/dev/null 2>&1 < <(
+		echo "
 			# Place jump for safety at the end of DUT RAM
 			buf a asm
 				jr -2
