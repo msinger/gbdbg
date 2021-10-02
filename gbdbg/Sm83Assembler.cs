@@ -8,6 +8,12 @@ namespace gbdbg
 {
 	public partial class Sm83Assembler : Sm83LexerBase
 	{
+		private static readonly ICollection<string> reserved = new string[] {
+			"A", "B", "C", "D", "E", "H", "L",
+			"BC", "DE", "HL", "SP", "AF", "HLI", "HLD",
+			"NZ", "Z", "LGE", "NC", "LLT",
+		};
+
 		private readonly Queue<object> fifo;
 
 		private readonly BinaryWriter bw;
@@ -479,10 +485,18 @@ namespace gbdbg
 			if (arg is Terminal)
 			{
 				Terminal t = (Terminal)arg;
-				if (t.Token.Type == LexerTokenType.Name)
+				if (t.Token.Type == LexerTokenType.Name && !reserved.Contains(t.Token.Name.ToUpper()))
 					return t.Token.Name;
 			}
 			return null;
+		}
+
+		private static string TryIndLabelArg(Argument arg)
+		{
+			if (!(arg is Indirection))
+				return null;
+			Indirection ind = (Indirection)arg;
+			return TryLabelArg(ind.Arg);
 		}
 
 		// Handles special cases of "LD A, ?" and "LD ?, A"
@@ -491,9 +505,16 @@ namespace gbdbg
 			byte load08 = load ? (byte)0x08 : (byte)0;
 			byte load10 = load ? (byte)0x10 : (byte)0;
 			int? adr = TryIndValArg(arg, false);
+			string lb = TryIndLabelArg(arg);
 			if (adr.HasValue) // (a8)
 			{
 				Enqueue(new byte[] { (byte)(0xe0 + load10), (byte)adr.Value });
+				return true;
+			}
+			if (lb != null) // (label)
+			{
+				Enqueue((byte)(0xe0 + load10));
+				EnqueueAbs8(lb);
 				return true;
 			}
 			if (arg is Indirection) // (?)
@@ -690,9 +711,16 @@ namespace gbdbg
 						if (k.Token.Type == LexerTokenType.Name && k.Token.Name.ToUpper() == "SP") // ?, SP
 						{
 							int? adr = TryIndValArg(t.Arg[0], true);
+							string l = TryIndLabelArg(t.Arg[0]);
 							if (adr.HasValue) // (a16), SP
 							{
 								Enqueue(new byte[] { 0x08, (byte)(adr.Value & 0xff), (byte)(adr.Value >> 8) });
+								break;
+							}
+							if (l != null) // (label), SP
+							{
+								Enqueue((byte)0x08);
+								EnqueueAbs16(l);
 								break;
 							}
 						}
@@ -719,9 +747,16 @@ namespace gbdbg
 					if (a0reg.HasValue) // { BC, DE, HL, SP }, ?
 					{
 						int? a1val = TryValArg(t.Arg[1], ushort.MinValue, ushort.MaxValue);
+						string l = TryLabelArg(t.Arg[1]);
 						if (a1val.HasValue) // { BC, DE, HL, SP }, d16
 						{
 							Enqueue(new byte[] { (byte)(0x01 | a0reg.Value), (byte)(a1val.Value & 0xff), (byte)(a1val.Value >> 8) });
+							break;
+						}
+						if (l != null) // { BC, DE, HL, SP }, label
+						{
+							Enqueue((byte)(0x01 | a0reg.Value));
+							EnqueueAbs16(l);
 							break;
 						}
 					}
@@ -740,6 +775,7 @@ namespace gbdbg
 							{
 								Indirection ind = (Indirection)t.Arg[1];
 								int? val = TryValArg(ind.Arg, byte.MinValue, byte.MaxValue);
+								string l = TryLabelArg(ind.Arg);
 								if (val.HasValue) // A, (a8)
 								{
 									Enqueue(new byte[] { 0xf0, (byte)val.Value });
@@ -747,12 +783,18 @@ namespace gbdbg
 								}
 								if (ind.Arg is Terminal)
 								{
-									Terminal l = (Terminal)ind.Arg;
-									if (l.Token.Type == LexerTokenType.Name && l.Token.Name.ToUpper() == "C") // A, (C)
+									Terminal rc = (Terminal)ind.Arg;
+									if (rc.Token.Type == LexerTokenType.Name && rc.Token.Name.ToUpper() == "C") // A, (C)
 									{
 										Enqueue((byte)0xf2);
 										break;
 									}
+								}
+								if (l != null) // A, (label)
+								{
+									Enqueue((byte)0xf0);
+									EnqueueAbs8(l);
+									break;
 								}
 							}
 						}
@@ -766,6 +808,7 @@ namespace gbdbg
 							{
 								Indirection ind = (Indirection)t.Arg[0];
 								int? val = TryValArg(ind.Arg, byte.MinValue, byte.MaxValue);
+								string l = TryLabelArg(ind.Arg);
 								if (val.HasValue) // (a8), A
 								{
 									Enqueue(new byte[] { 0xe0, (byte)val.Value });
@@ -773,12 +816,18 @@ namespace gbdbg
 								}
 								if (ind.Arg is Terminal)
 								{
-									Terminal l = (Terminal)ind.Arg;
-									if (l.Token.Type == LexerTokenType.Name && l.Token.Name.ToUpper() == "C") // (C), A
+									Terminal rc = (Terminal)ind.Arg;
+									if (rc.Token.Type == LexerTokenType.Name && rc.Token.Name.ToUpper() == "C") // (C), A
 									{
 										Enqueue((byte)0xe2);
 										break;
 									}
+								}
+								if (l != null) // (label), A
+								{
+									Enqueue((byte)0xe0);
+									EnqueueAbs8(l);
+									break;
 								}
 							}
 						}
@@ -861,9 +910,16 @@ namespace gbdbg
 							{
 								Indirection ind = (Indirection)t.Arg[1];
 								int? val = TryValArg(ind.Arg, ushort.MinValue, ushort.MaxValue);
+								string l = TryLabelArg(ind.Arg);
 								if (val.HasValue) // A, (a16)
 								{
 									Enqueue(new byte[] { 0xfa, (byte)(val.Value & 0xff), (byte)(val.Value >> 8) });
+									break;
+								}
+								if (l != null) // A, (label)
+								{
+									Enqueue((byte)0xfa);
+									EnqueueAbs16(l);
 									break;
 								}
 							}
@@ -878,9 +934,16 @@ namespace gbdbg
 							{
 								Indirection ind = (Indirection)t.Arg[0];
 								int? val = TryValArg(ind.Arg, ushort.MinValue, ushort.MaxValue);
+								string l = TryLabelArg(ind.Arg);
 								if (val.HasValue) // (a16), A
 								{
 									Enqueue(new byte[] { 0xea, (byte)(val.Value & 0xff), (byte)(val.Value >> 8) });
+									break;
+								}
+								if (l != null) // (label), A
+								{
+									Enqueue((byte)0xea);
+									EnqueueAbs16(l);
 									break;
 								}
 							}
@@ -978,18 +1041,24 @@ namespace gbdbg
 						a0 = t.Arg[0];
 						a1 = t.Arg[1];
 					}
-					if (a0 == null)
-						Enqueue((byte)0x18);
-					else
-						Enqueue((byte)(0x20 | CondArg(a0)));
+					byte op = 0x18;
+					if (a0 != null)
+						op = (byte)(0x20 | CondArg(a0));
 					int? adr = TryValArg(a1, sbyte.MinValue, sbyte.MaxValue);
 					string l = TryLabelArg(a1);
 					if (adr.HasValue)
-						Enqueue((byte)adr.Value);
+					{
+						Enqueue(new byte[] { op, (byte)adr.Value });
+					}
 					else if (l != null)
+					{
+						Enqueue(op);
 						EnqueueRel8(l, (ushort)(org + 1));
+					}
 					else
+					{
 						throw new AsmFormatException(a1.Pos, "Label or relative address expected.");
+					}
 					break;
 				}
 
@@ -1025,18 +1094,24 @@ namespace gbdbg
 						a0 = t.Arg[0];
 						a1 = t.Arg[1];
 					}
-					if (a0 == null)
-						Enqueue((byte)0xc3);
-					else
-						Enqueue((byte)(0xc2 | CondArg(a0)));
+					byte op = 0xc3;
+					if (a0 != null)
+						op = (byte)(0xc2 | CondArg(a0));
 					int? adr = TryValArg(a1, ushort.MinValue, ushort.MaxValue);
 					string l = TryLabelArg(a1);
 					if (adr.HasValue)
-						Enqueue(new byte[] { (byte)(adr.Value & 0xff), (byte)(adr.Value >> 8) });
+					{
+						Enqueue(new byte[] { op, (byte)(adr.Value & 0xff), (byte)(adr.Value >> 8) });
+					}
 					else if (l != null)
+					{
+						Enqueue(op);
 						EnqueueAbs16(l);
+					}
 					else
+					{
 						throw new AsmFormatException(a1.Pos, "(HL), label or absolute address expected.");
+					}
 					break;
 				}
 
@@ -1050,18 +1125,24 @@ namespace gbdbg
 						a0 = t.Arg[0];
 						a1 = t.Arg[1];
 					}
-					if (a0 == null)
-						Enqueue((byte)0xcd);
-					else
-						Enqueue((byte)(0xc4 | CondArg(a0)));
+					byte op = 0xcd;
+					if (a0 != null)
+						op = (byte)(0xc4 | CondArg(a0));
 					int? adr = TryValArg(a1, ushort.MinValue, ushort.MaxValue);
 					string l = TryLabelArg(a1);
 					if (adr.HasValue)
-						Enqueue(new byte[] { (byte)(adr.Value & 0xff), (byte)(adr.Value >> 8) });
+					{
+						Enqueue(new byte[] { op, (byte)(adr.Value & 0xff), (byte)(adr.Value >> 8) });
+					}
 					else if (l != null)
+					{
+						Enqueue(op);
 						EnqueueAbs16(l);
+					}
 					else
+					{
 						throw new AsmFormatException(a1.Pos, "Label or absolute address expected.");
+					}
 					break;
 				}
 
