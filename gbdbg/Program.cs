@@ -327,6 +327,28 @@ namespace gbdbg
 								last_error = 3;
 								break;
 							}
+							try
+							{
+								asm.Flush();
+							}
+							catch (LabelNotFoundException e)
+							{
+								eout.WriteLine(e.Message);
+								last_error = 3;
+								break;
+							}
+							catch (LabelTooFarException e)
+							{
+								eout.WriteLine(e.Message);
+								last_error = 3;
+								break;
+							}
+							catch
+							{
+								eout.WriteLine("Failed to assemble block");
+								last_error = 3;
+								break;
+							}
 							m.Position = 0;
 							if (interactive)
 							{
