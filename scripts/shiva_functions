@@ -1404,8 +1404,20 @@ function boot_dut_unlocked () {
 		$(sysgen_set_counter_match 0 4 1)
 
 		; Trigger when DUT reads address 0x014c
-		;(sysgen_set_dut_comparator 0 $((0x0500814c)) $((0x2f00ffff)))
-		$(sysgen_set_dut_comparator 0 $((0x0500814c)) $((0x0000ffff)))
+		$(sysgen_set_dut_comparator 0 $((
+			0x14c << DUT_BIT_ADR_SHIFT |
+			DUT_BIT_CS_ROM |
+			DUT_BIT_DATA_OUT_DIR |
+			DUT_BIT_RD
+		)) $((
+			DUT_BIT_ADR_MASK |
+			DUT_BIT_CS_ROM |
+			DUT_BIT_DATA_OUT_DIR |
+			DUT_BIT_CS_RAM |
+			DUT_BIT_RD |
+			DUT_BIT_WR |
+			DUT_BIT_RST
+		)))
 
 		; Route 2 carries DUT bus compare match to counter 0 STOP
 		$(sysgen_set_dut_match    0 2)
