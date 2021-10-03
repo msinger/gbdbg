@@ -69,6 +69,13 @@ DUT_ADR_IN1=$((  0xff51 ))
 DUT_DATA_IN=$((  0xff52 ))
 DUT_DATA_OUT=$(( 0xff52 ))
 DUT_IN=$((       0xff53 ))
+DUT_IN_DATA_DIR_OUT_POS=$(( 0 ))
+DUT_IN_CS_RAM_POS=$((       1 ))
+DUT_IN_RD_POS=$((           2 ))
+DUT_IN_WR_POS=$((           3 ))
+DUT_IN_PHI_POS=$((          4 ))
+DUT_IN_RST_POS=$((          5 ))
+DUT_IN_PA0_POS=$((          6 ))
 DUT_CMP_OUT=$((  0xff51 ))
 DUT_CMP_IN=$((   0xff53 ))
 DUT_CTRL_SET_RESET=$((   1 << 0 ))
@@ -91,6 +98,41 @@ DUT_CMP_IN_MASK0=$((     1 << 4 ))
 DUT_CMP_IN_MASK1=$((     1 << 5 ))
 DUT_CMP_IN_MASK2=$((     1 << 6 ))
 DUT_CMP_IN_MASK3=$((     1 << 7 ))
+DUT_BIT_ADR_SHIFT=0
+DUT_BIT_ADR_MASK=$((     0x7fff << 0 ))
+DUT_BIT_ADR0=$((         1 << 0 ))
+DUT_BIT_ADR1=$((         1 << 1 ))
+DUT_BIT_ADR2=$((         1 << 2 ))
+DUT_BIT_ADR3=$((         1 << 3 ))
+DUT_BIT_ADR4=$((         1 << 4 ))
+DUT_BIT_ADR5=$((         1 << 5 ))
+DUT_BIT_ADR6=$((         1 << 6 ))
+DUT_BIT_ADR7=$((         1 << 7 ))
+DUT_BIT_ADR8=$((         1 << 8 ))
+DUT_BIT_ADR9=$((         1 << 9 ))
+DUT_BIT_ADR10=$((        1 << 10 ))
+DUT_BIT_ADR11=$((        1 << 11 ))
+DUT_BIT_ADR12=$((        1 << 12 ))
+DUT_BIT_ADR13=$((        1 << 13 ))
+DUT_BIT_ADR14=$((        1 << 14 ))
+DUT_BIT_CS_ROM=$((       1 << 15 ))
+DUT_BIT_DATA_SHIFT=16
+DUT_BIT_DATA_MASK=$((    0xff << 16 ))
+DUT_BIT_DATA0=$((        1 << 16 ))
+DUT_BIT_DATA1=$((        1 << 17 ))
+DUT_BIT_DATA2=$((        1 << 18 ))
+DUT_BIT_DATA3=$((        1 << 19 ))
+DUT_BIT_DATA4=$((        1 << 20 ))
+DUT_BIT_DATA5=$((        1 << 21 ))
+DUT_BIT_DATA6=$((        1 << 22 ))
+DUT_BIT_DATA7=$((        1 << 23 ))
+DUT_BIT_DATA_DIR_OUT=$(( 1 << 24 ))
+DUT_BIT_CS_RAM=$((       1 << 25 ))
+DUT_BIT_RD=$((           1 << 26 ))
+DUT_BIT_WR=$((           1 << 27 ))
+DUT_BIT_PHI=$((          1 << 28 ))
+DUT_BIT_RST=$((          1 << 29 ))
+DUT_BIT_PA0=$((          1 << 30 ))
 
 IFLAG=$(( 0xfffe ))
 IEN=$((   0xffff ))
@@ -413,6 +455,26 @@ function disable_all_breakpoints () {
 	)
 }
 
+function init_dut_ram_for_boot () {
+	if (($#)); then
+		return 1
+	fi
+
+	local hdr
+	hdr=$(gen_default_hdr) || return $?
+
+	run >/dev/null 2>&1 < <(echo "
+		$hdr
+
+		# Place jump at DUT entry point
+		buf a asm
+			nop
+			jr -2
+		end
+		buf a store $((DUTRAM_START + 0x100))+3
+	")
+}
+
 function init () {
 	if (($#)); then
 		return 1
@@ -424,9 +486,7 @@ function init () {
 	led 0                   || return $?
 
 	local atom
-	local hdr
 	atom=$(gen_set_atom 0) || return $?
-	hdr=$(gen_default_hdr) || return $?
 
 	run >/dev/null 2>&1 < <(echo "
 		# Disconnect routes to Port A Pin 0 trigger inputs to make sure DUT gets no clock
@@ -463,28 +523,17 @@ function init () {
 		ld (hli), a
 		bit 5, h  ; expects end of DUT RAM to be 0x1fff
 		jr z, loop2
+
+		; Place jump for safety at the end of DUT RAM
+		ld a, 0x18  ; JR instruction
+		ldx ($((DUTRAM_END - 1))), a
+		ld a, 0xfe  ; -2
+		ldx ($DUTRAM_END), a
 	") || return $?
 
 	run >/dev/null 2>&1 < <(
-		echo "
-			# Place jump for safety at the end of DUT RAM
-			buf a asm
-				jr -2
-			end
-			buf a store $((DUTRAM_END - 1))+2
-
-			# Place jump at DUT entry point
-			buf a asm
-				nop
-				jr -2
-			end
-			buf a store $((DUTRAM_START + 0x100))+3
-
-			$hdr
-
-			# Disconnect always one source
-			wr $ONES 0
-		"
+		# Disconnect always one source
+		echo "wr $ONES 0"
 
 		# Reset counters
 		for ((i = 0; i < NUM_COUNTERS; i++)); do
@@ -494,15 +543,12 @@ function init () {
 		done
 
 		echo "
-			# Reset DUT and DUT connector
+			# Reset DUT connector
 			wr $DUT_CMP_OUT 0xff
-			wr $DUT_CTRL    $((DUT_CTRL_RESET_DATA | DUT_CTRL_SET_RESET))
+			wr $DUT_CTRL    $((DUT_CTRL_RESET_DATA | DUT_CTRL_RESET_RESET))
 
 			# Reset interrupts flags
 			wr $IFLAG 0
-
-			# Deassert DUT reset
-			wr $DUT_CTRL $DUT_CTRL_RESET_RESET
 		"
 
 		(
@@ -978,6 +1024,49 @@ function sysgen_set_dut_match_edge () {
 	sysgen_set_routes $DUT_CMP_OUT $((1 << (comparator + 4))) "$@"
 }
 
+function checkargs_dut_override () {
+	if (($# == 1)) && ! isint "$1"; then
+		return 1
+	fi
+	if (($# > 1)); then
+		return 1
+	fi
+}
+
+function dut_override_data () {
+	local gen; gen=$(gen_dut_override_data "$@") || return $?
+	run >/dev/null < <(echo "$gen")
+}
+
+function gen_dut_override_data () {
+	checkargs_dut_override "$@" || return $?; local data=$1
+	if (($#)); then
+		echo "
+			wr $DUT_DATA_OUT $data
+			wr $DUT_CTRL $DUT_CTRL_SET_DATA
+		"
+	else
+		echo "wr $DUT_CTRL $DUT_CTRL_RESET_DATA"
+	fi
+}
+
+function sysgen_dut_override_data () {
+	checkargs_dut_override "$@" || return $?; local data=$1
+	if (($#)); then
+		echo "
+			ld a, $data
+			ld ($DUT_DATA_OUT), a
+			ld a, $DUT_CTRL_SET_DATA
+			ld ($DUT_CTRL), a
+		"
+	else
+		echo "
+			ld a, $DUT_CTRL_RESET_DATA
+			ld ($DUT_CTRL), a
+		"
+	fi
+}
+
 function wait_for_halt () {
 	if (($# > 1)); then
 		return 1
@@ -1037,8 +1126,6 @@ function sys_run () {
 		return 1
 	fi
 
-	run h || return $?
-
 	local len
 	len=$(sys_code $adr < <(cat; echo; echo nop; echo "jr -2")) || return $?
 
@@ -1058,6 +1145,173 @@ function sys_run () {
 	return $res
 }
 
+function dut_run () {
+	if (($# != 1 && $# != 2)); then
+		return 1
+	fi
+
+	local adr=$1
+	local timeout=${2--1}
+	if ! isint "$adr" || ! isint "$timeout"; then
+		return 1
+	fi
+
+	local res=0
+	local restore_routes=0
+
+	stop_dut_clock || res=$?
+
+	local len
+	if ((!res)); then
+		len=$(dut_code $adr < <(cat; echo; echo nop; echo "jr -2")) || res=$?
+	fi
+
+	local scode
+	scode=$(echo "
+		; Only output NOPs on data lines when DUT reads from cartridge
+		$(sysgen_dut_override_data 0)
+
+		; Clock "manually" for seven memory cycles, so CPU finishes current instruction and read NOPs
+		ld b, $((7 * 4))
+	clk_loop:
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+		dec b
+		jr nz, clk_loop
+
+		; Clock "manually" until PHI has falling edge, so we know that we are at the beginning of a memory cycle
+	phi0:
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+		ld a, ($DUT_IN)
+		bit $DUT_IN_PHI_POS, a
+		jr z, phi0
+	phi1:
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+		ld a, ($DUT_IN)
+		bit $DUT_IN_PHI_POS, a
+		jr nz, phi1
+
+		; Output JP instruction to DUT
+		$(sysgen_dut_override_data $((0xc3)))
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+
+		; Output LSB of address to DUT
+		$(sysgen_dut_override_data $((adr & 0xff)))
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+
+		; Output MSB of address to DUT
+		$(sysgen_dut_override_data $((adr >> 8)))
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+
+		; Stop overriding DUT data lines
+		$(sysgen_dut_override_data)
+
+		; Finish the jump.
+		; We have to make sure the jump is finished before setting up the comparator, just in case
+		; the PC is currently at our "jr -2" instruction at the end. In that rare case, we would immediately
+		; get triggered by the comparator and think we are already finished executing the code, when in fact we
+		; haven't even started.
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+		$(sysgen_reset_porta $((0x01)))
+		$(sysgen_set_porta   $((0x01)))
+
+		; Trigger when DUT reads address off the "jr -2" instruction we've placed at the end
+		$(sysgen_set_dut_comparator 0 $((
+			(adr + len - 2) << DUT_BIT_ADR_SHIFT |
+			DUT_BIT_CS_ROM |
+			DUT_BIT_DATA_OUT_DIR |
+			DUT_BIT_RD
+		)) $((
+			DUT_BIT_ADR_MASK |
+			DUT_BIT_CS_ROM |
+			DUT_BIT_DATA_OUT_DIR |
+			DUT_BIT_CS_RAM |
+			DUT_BIT_RD |
+			DUT_BIT_WR |
+			DUT_BIT_RST
+		)))
+
+		; Route 2 carries DUT bus compare match to counter 0 STOP and RESET
+		$(sysgen_set_dut_match     0   2)
+		$(sysgen_set_counter_stop  0   2)
+		$(sysgen_set_counter_reset 0 1 2)
+
+		; Clear interrupt flags
+		xor a
+		ld ($IFLAG), a
+
+		; Start Counter 0 again
+		$(sysgen_start_counter 0)
+
+		; Wait for match
+		ld hl, $IFLAG
+	loop:
+		ld a, (hl)
+		bit 2, a
+		jr z, loop
+
+		; Disconnect route 2 on both ends
+		$(sysgen_set_dut_match     0)
+		$(sysgen_set_counter_stop  0)
+		$(sysgen_set_counter_reset 0 1)
+
+		; Start Counter 0 again
+		$(sysgen_start_counter 0)
+	")
+
+	if ((!res)); then
+		restore_routes=1
+		sys_run $((0x100)) $timeout < <(echo "$scode") || res=$?
+	fi
+
+	# Make sure DUT is getting clocked again, even in the case of an error
+	if ((res)); then
+		if ((restore_routes)); then
+			sys_run $((0x100)) 2 < <(echo "
+				; Disconnect route 2 on both ends
+				$(sysgen_set_dut_match     0)
+				$(sysgen_set_counter_stop  0)
+				$(sysgen_set_counter_reset 0 1)
+
+				; Start Counter 0 again
+				$(sysgen_start_counter 0)
+			")
+		else
+			start_dut_clock
+		fi
+	fi
+
+	return $res
+}
+
 function start_dut_clock () {
 	start_counter 0
 }
@@ -1071,21 +1325,71 @@ function reset_dut () {
 	run "wr $DUT_CTRL $DUT_CTRL_SET_RESET" "wr $DUT_CTRL $DUT_CTRL_RESET_RESET"
 }
 
-# Before calling boot_dut(), the system must be properly setup (by init()) and
-# there must be a valid GameBoy header at DUTRAM_START+0x100, otherwise this will fail.
-function boot_dut() {
-	stop_dut_clock  || return $?
-	reset_dut       || return $?
-	start_dut_clock
+function boot_dut () {
+	stop_dut_clock        || return $?
+	init_dut_ram_for_boot || return $?
+	reset_dut             || return $?
+
+	sys_run $((0x100)) 7 < <(echo "
+		; Trigger when DUT reads address 0x101
+		$(sysgen_set_dut_comparator 0 $((
+			0x101 << DUT_BIT_ADR_SHIFT |
+			DUT_BIT_CS_ROM |
+			DUT_BIT_DATA_OUT_DIR |
+			DUT_BIT_RD
+		)) $((
+			DUT_BIT_ADR_MASK |
+			DUT_BIT_CS_ROM |
+			DUT_BIT_DATA_OUT_DIR |
+			DUT_BIT_CS_RAM |
+			DUT_BIT_RD |
+			DUT_BIT_WR |
+			DUT_BIT_RST
+		)))
+
+		; Route 2 carries DUT bus compare match to counter 0 STOP and RESET
+		$(sysgen_set_dut_match     0   2)
+		$(sysgen_set_counter_stop  0   2)
+		$(sysgen_set_counter_reset 0 1 2)
+
+		; Clear interrupt flags
+		xor a
+		ld ($IFLAG), a
+
+		; Start Counter 0 again
+		$(sysgen_start_counter 0)
+
+		; Wait for match
+		ld hl, $IFLAG
+	loop:
+		ld a, (hl)
+		bit 2, a
+		jr z, loop
+
+		; Disconnect route 2 on both ends
+		$(sysgen_set_dut_match     0)
+		$(sysgen_set_counter_stop  0)
+		$(sysgen_set_counter_reset 0 1)
+
+		; Start Counter 0 again
+		$(sysgen_start_counter 0)
+	")
 }
 
-# Before calling boot_dut_unlocked(), the system must be properly setup (by init()) and
-# there must be a valid GameBoy header at DUTRAM_START+0x100, otherwise this will fail.
 function boot_dut_unlocked () {
-	stop_dut_clock || return $?
-	reset_dut      || return $?
+	stop_dut_clock        || return $?
+	init_dut_ram_for_boot || return $?
 
-	sys_run $((0x100)) 7 <<EOF
+	# Place loop at 0x200 and some NOPs before that, where the DUT arrives after overclocking
+	dut_code $((0x1fe)) >/dev/null < <(echo "
+		nop
+		nop
+		jr -2
+	") || return $?
+
+	reset_dut || return $?
+
+	sys_run $((0x100)) 7 < <(echo "
 		; Configure 30 MHz on counter 0 compare regs 2&3&4
 		$(sysgen_set_counter_comparator 0 2 16)
 		$(sysgen_set_counter_comparator 0 3 17)
@@ -1098,8 +1402,8 @@ function boot_dut_unlocked () {
 		$(sysgen_set_counter_match 0 4 1)
 
 		; Trigger when DUT reads address 0x014c
-		;(sysgen_set_dut_comparator 0 $((0x0400814c)) $((0x2f00ffff)))
-		$(sysgen_set_dut_comparator 0 $((0x0400814c)) $((0x0000ffff)))
+		;(sysgen_set_dut_comparator 0 $((0x0500814c)) $((0x2f00ffff)))
+		$(sysgen_set_dut_comparator 0 $((0x0500814c)) $((0x0000ffff)))
 
 		; Route 2 carries DUT bus compare match to counter 0 STOP
 		$(sysgen_set_dut_match    0 2)
@@ -1167,5 +1471,45 @@ function boot_dut_unlocked () {
 		$(sysgen_set_counter_match 0 2)
 		$(sysgen_set_counter_match 0 3)
 		$(sysgen_set_counter_match 0 4)
-EOF
+
+		; Trigger when DUT reads address 0x200
+		$(sysgen_set_dut_comparator 0 $((
+			0x200 << DUT_BIT_ADR_SHIFT |
+			DUT_BIT_CS_ROM |
+			DUT_BIT_DATA_OUT_DIR |
+			DUT_BIT_RD
+		)) $((
+			DUT_BIT_ADR_MASK |
+			DUT_BIT_CS_ROM |
+			DUT_BIT_DATA_OUT_DIR |
+			DUT_BIT_CS_RAM |
+			DUT_BIT_RD |
+			DUT_BIT_WR |
+			DUT_BIT_RST
+		)))
+
+		; Clear interrupt flags
+		xor a
+		ld ($IFLAG), a
+
+		; Route 2 carries DUT bus compare match to counter 0 STOP and RESET
+		$(sysgen_set_counter_stop  0   2)
+		$(sysgen_set_counter_reset 0 1 2)
+		$(sysgen_set_dut_match     0   2)
+
+		; Wait for match
+		ld hl, $IFLAG
+	loop3:
+		ld a, (hl)
+		bit 2, a
+		jr z, loop3
+
+		; Disconnect route 2 on both ends
+		$(sysgen_set_dut_match     0)
+		$(sysgen_set_counter_stop  0)
+		$(sysgen_set_counter_reset 0 1)
+
+		; Start Counter 0 again
+		$(sysgen_start_counter 0)
+	")
 }

@@ -27,8 +27,14 @@ dut_code $((0x400)) >/dev/null <<EOF
 	$(asmgen_string $cur_date)
 EOF
 
+echo Booting DUT with boot ROM unlocked... >&2
+boot_dut_unlocked
+
+led 2
+
 # DUT code that dumps bootrom
-dut_code $((0x200)) >/dev/null <<EOF
+echo Dumping... >&2
+dut_run $((0x200)) 5 <<EOF
 	; Dump 0x0000-0x00ff to 0xa000
 	ld hl, 0
 	ld bc, 0xa000
@@ -48,42 +54,24 @@ loop2:
 	inc bc
 	bit 0, h
 	jr z, loop2
-
-	; Loop here
-	jr -2
 EOF
 
-echo Booting DUT... >&2
-boot_dut_unlocked
-
-led 2
-
-echo Waiting for dump... >&2
-timeout=5
-while true; do
-	if ((timeout > 0)); then
-		((timeout--))
-	fi
-	dump=$(run "dump $((DUTRAM_START + 0x100))+${#cur_date}" 2>/dev/null)
-	str=$(echo "$dump" | sed -e '
-		/:[^|]*|.*|/!d
-		s/^[^|]*:[^|]*|\(.*\)|[^|]*$/\1/
-	' | sed -e '
-		:next
-		N
-		$! b next
-		s,\n,,g
-	')
-	if [ "$cur_date" == "$str" ]; then
-		break
-	fi
-	if ((timeout != 0)); then
-		sleep 1
-		continue
-	fi
-	echo Timeout! >&2
+echo Checking timestamp of dump... >&2
+dump=$(run "dump $((DUTRAM_START + 0x100))+${#cur_date}" 2>/dev/null)
+str=$(echo "$dump" | sed -e '
+	/:[^|]*|.*|/!d
+	s/^[^|]*:[^|]*|\(.*\)|[^|]*$/\1/
+' | sed -e '
+	:next
+	N
+	$! b next
+	s,\n,,g
+')
+if [ "$cur_date" != "$str" ]; then
+	echo Failed >&2
 	exit 1
-done
+fi
+echo "$str" >&2
 
 echo Receiving dump... >&2
 if [ -n "$BINARYOUT" ]; then
