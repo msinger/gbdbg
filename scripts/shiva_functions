@@ -558,9 +558,9 @@ function init () {
 			# Route 3 to Counter 0 COUNT
 			gen_set_counter_count 0 3           || exit
 
-			# Configure ~4.28 MHz on counter 0 compare regs 0&1
-			gen_set_counter_comparator 0 0 6    || exit
-			gen_set_counter_comparator 0 1 13   || exit
+			# Configure ~4.125 MHz on counter 0 compare regs 0&1
+			gen_set_counter_comparator 0 0 7    || exit
+			gen_set_counter_comparator 0 1 15   || exit
 
 			# Use Route 0 to reset Port A Pin 0 when compare reg 0 triggers
 			gen_set_counter_match 0 0 0         || exit
@@ -1392,10 +1392,10 @@ function boot_dut_unlocked () {
 	reset_dut || return $?
 
 	sys_run $((0x100)) 7 < <(echo "
-		; Configure 30 MHz on counter 0 compare regs 2&3&4
-		$(sysgen_set_counter_comparator 0 2 16)
-		$(sysgen_set_counter_comparator 0 3 17)
-		$(sysgen_set_counter_comparator 0 4 18)
+		; Configure 33 MHz on counter 0 compare regs 2&3&4
+		$(sysgen_set_counter_comparator 0 2 18)
+		$(sysgen_set_counter_comparator 0 3 19)
+		$(sysgen_set_counter_comparator 0 4 20)
 
 		; Compare reg 3 also triggers reset Port A via Route 0
 		$(sysgen_set_counter_match 0 3 0)
@@ -1435,8 +1435,8 @@ function boot_dut_unlocked () {
 		$(sysgen_set_dut_match 0)
 		$(sysgen_set_counter_stop 0)
 
-		; Load 15 to counter 0
-		$(sysgen_set_counter_load 0 15)
+		; Load 17 to counter 0
+		$(sysgen_set_counter_load 0 17)
 		$(sysgen_reload_counter 0)
 
 		; Connect Route 2 to compare reg 2
