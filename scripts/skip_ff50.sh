@@ -58,32 +58,6 @@ dut_code 0 >/dev/null <<"EOF"
 	.db 0xde 0xad 0xc0 0xde
 EOF
 
-# Make route 3 always one
-set_always_one 3
-
-# Route 3 to Counter 0 COUNT
-set_counter_count 0 3
-
-# Configure ~4.28 MHz on counter 0 compare regs 0&1
-set_counter_comparator 0 0 6
-set_counter_comparator 0 1 13
-
-# Configure 30 MHz on counter 0 compare regs 2&3&4
-set_counter_comparator 0 2 16
-set_counter_comparator 0 3 17
-set_counter_comparator 0 4 18
-
-# Use Route 0 to reset Port A Pin 0 when compare reg 0 or 3 triggers
-set_counter_match 0 0 0
-set_counter_match 0 3 0
-set_porta_reset   0   0
-
-# Use Route 1 to set Port A Pin 0 and reset counter 0 when compare reg 1 or 4 triggers
-set_counter_match 0 1 1
-set_counter_match 0 4 1
-set_counter_reset 0   1
-set_porta_set     0   1
-
 # Connect Route 2 to compare reg 2
 set_counter_match 0 2 2
 
