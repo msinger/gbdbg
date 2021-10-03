@@ -516,19 +516,12 @@ function init () {
 			gen_set_counter_comparator 0 0 6    || exit
 			gen_set_counter_comparator 0 1 13   || exit
 
-			# Configure 30 MHz on counter 0 compare regs 2&3&4
-			gen_set_counter_comparator 0 2 16   || exit
-			gen_set_counter_comparator 0 3 17   || exit
-			gen_set_counter_comparator 0 4 18   || exit
-
-			# Use Route 0 to reset Port A Pin 0 when compare reg 0 or 3 triggers
+			# Use Route 0 to reset Port A Pin 0 when compare reg 0 triggers
 			gen_set_counter_match 0 0 0         || exit
-			gen_set_counter_match 0 3 0         || exit
 			gen_set_porta_reset   0   0         || exit
 
-			# Use Route 1 to set Port A Pin 0 and reset counter 0 when compare reg 1 or 4 triggers
+			# Use Route 1 to set Port A Pin 0 and reset counter 0 when compare reg 1 triggers
 			gen_set_counter_match 0 1 1         || exit
-			gen_set_counter_match 0 4 1         || exit
 			gen_set_counter_reset 0   1         || exit
 			gen_set_porta_set     0   1         || exit
 		) || { res=$?; echo; echo error $res; }
@@ -1064,3 +1057,13 @@ function sys_run () {
 	set_breakpoint 0
 	return $res
 }
+
+function start_dut_clock () {
+	start_counter 0
+}
+
+function stop_dut_clock () {
+	stop_counter 0
+	reset_counter 0
+}
+
