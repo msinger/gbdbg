@@ -24,8 +24,13 @@ ATOM3=$(( 0xff13 ))
 ONES=$(( 0xff14 ))
 
 REC_CTRL=$(( 0xff15 ))
-REC_CTRL_SET_ADR=$((  1 << 0 ))
-REC_CTRL_SET_TRIG=$(( 1 << 1 ))
+REC_CTRL_SET_START=$((  1 << 0 ))
+REC_CTRL_SET_STOP=$((   1 << 1 ))
+REC_CTRL_SET_RECORD=$(( 1 << 2 ))
+REC_CTRL_START=$((      1 << 3 ))
+REC_CTRL_STOP=$((       1 << 4 ))
+REC_CTRL_RECORD=$((     1 << 5 ))
+REC_CTRL_SET_ADR=$((    1 << 7 ))
 
 NUM_COUNTERS=2
 COUNTER_BASE=( $((0xff20)) $((0xff24)) )
