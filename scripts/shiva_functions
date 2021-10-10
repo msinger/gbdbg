@@ -1532,3 +1532,176 @@ function boot_dut_unlocked () {
 		$(sysgen_start_counter 0)
 	")
 }
+
+function checkargs_dump () {
+	local pos=0
+	adr=
+	len=256
+	mode=hex
+	while (($#)); do
+		case "$1" in
+		-*)
+			case "$1" in
+			--hex)
+				mode=hex
+				;;
+			--bin)
+				mode=binary
+				;;
+			--dis)
+				mode=disassembly
+				;;
+			*)
+				echo Unknown option >&2
+				return 1
+				;;
+			esac
+			;;
+		*)
+			if ((pos == 0)); then
+				adr=$1
+			elif ((pos == 1)); then
+				len=$1
+			else
+				echo Too many arguments >&2
+				return 1
+			fi
+			((pos++))
+			;;
+		esac
+		shift
+	done
+	if ((pos < 1)); then
+		echo Too few arguments >&2
+		return 1
+	fi
+	if ! isint "$adr"; then
+		echo Address not a number >&2
+		return 1
+	fi
+	if ! isint "$len"; then
+		echo Length not a number >&2
+		return 1
+	fi
+	if ((adr < 0 || adr > 0xffff)); then
+		echo Address out of range >&2
+		return 1
+	fi
+	if ((pos < 2 && adr + len > 0x10000)); then
+		len=$((0x10000 - adr))
+	fi
+	if ((len < 1 || len > 0x10000)); then
+		echo Length out of range >&2
+		return 1
+	fi
+	if ((adr + len > 0x10000)); then
+		echo Address + Length out of range >&2
+		return 1
+	fi
+}
+
+function sys_dump () {
+	local adr
+	local len
+	local mode
+	checkargs_dump "$@" || return $?
+	if [ "$mode" == binary ]; then
+		local l
+		local bs=256
+		local dump
+		local elements=()
+		while ((len)); do
+			l=$len
+			if ((l > bs)); then
+				l=$bs
+			fi
+			dump=$(run "dump $adr+$l" 2>/dev/null) || return $?
+			elements=( $(echo "$dump" | sed -e '
+				/:[^|]*|.*|/!d
+				s/^[^|]*:\([^|]*\)|.*|[^|]*$/\1/
+			') )
+			echo "${elements[*]}" | xxd -r -ps
+			len=$((len - l))
+			adr=$((adr + l))
+		done
+	elif [ "$mode" == disassembly ]; then
+		run "dis $adr+$len" 2>/dev/null
+	else
+		run "dump $adr+$len" 2>/dev/null
+	fi
+}
+
+function dut_dump () {
+	local adr
+	local len
+	local mode
+	checkargs_dump "$@" || return $?
+	while ((len)); do
+		local l=$len
+		if ((l > DUTRAM_LEN - 16)); then
+			l=$((DUTRAM_LEN - 16))
+		fi
+		local last=$((l == len))
+		dut_run $((0x200)) 3 < <(echo "
+			ld hl, 0xa000
+			ld bc, $adr
+			ld de, $((l + 2)) ; Grab two more bytes for disassembler
+		loop:
+			ld a, (bc)
+			ld (hli), a
+			inc bc
+			dec de
+			ld a, d
+			or e
+			jr nz, loop
+		") || return $?
+		if [ "$mode" == hex ]; then
+			local dump
+			local line
+			dump=$(sys_dump --hex $DUTRAM_START $l) || return $?
+			while read -r line; do
+				if ! ((last)) && [ -z "$(echo "$line" | sed -e '/^ *[0-9a-fA-F]\+ *: *| *| *$/d')" ]; then
+					continue
+				fi
+				local a
+				local r
+				a=$(($(echo "$line" | sed -e 's,^ *\([0-9a-fA-F]\+\) *:.*$,0x\1,')))
+				r=$(echo "$line" | sed -e 's,^ *[0-9a-fA-F]\+ *\(:.*\)$,\1,')
+				a=$((a - DUTRAM_START + adr))
+				printf "%04x%s\n" $a "$r"
+			done < <(echo "$dump")
+		elif [ "$mode" == disassembly ]; then
+			local dump
+			local line
+			local dis_len
+			dump=$(sys_dump --dis $DUTRAM_START $l) || return $?
+			while read -r line; do
+				local a
+				local r
+				a=$(($(echo "$line" | sed -e 's,^ *\([0-9a-fA-F]\+\) *:.*$,0x\1,')))
+				r=$(echo "$line" | sed -e 's,^ *[0-9a-fA-F]\+ *\(:.*\)$,\1,')
+
+				# Disassembler may disassemble up to two bytes more than expected, iff last instruction has
+				# multiple bytes: Count them.
+				l=$((a + $(echo "$r" | sed -e 's,^:\(..........\).*$,\1,' | wc -w) - DUTRAM_START))
+
+				a=$((a - DUTRAM_START + adr))
+				if [ -z "$(echo "$r" | sed -e '/^:.......... *[Jj][Rr] \+.* \+; \+\$[0-9a-fA-F]\+ *$/d')" ]; then
+					local j=$(($(echo "$r" | sed -e 's,^:.......... *[Jj][Rr] \+.* \+; \+\$\([0-9a-fA-F]\+\) *$,0x\1,')))
+					r=$(echo "$r" | sed -e 's,^\(:.......... *[Jj][Rr] \+.* \+; \+\$\)[0-9a-fA-F]\+ *$,\1,')
+					j=$((j - DUTRAM_START + adr))
+					printf "  %04x%s%04x\n" $a "$r" $j
+				else
+					printf "  %04x%s\n" $a "$r"
+				fi
+			done < <(echo "$dump")
+			if ((l > len)); then
+				l=$len
+			fi
+		else
+			sys_dump --bin $DUTRAM_START $l || return $?
+		fi
+		len=$((len - l))
+		adr=$((adr + l))
+	done
+}
