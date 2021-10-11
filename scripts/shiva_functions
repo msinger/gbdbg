@@ -634,6 +634,102 @@ function set_always_one        () { set_routes        $ONES 0 "$@"; }
 function gen_set_always_one    () { gen_set_routes    $ONES 0 "$@"; }
 function sysgen_set_always_one () { sysgen_set_routes $ONES 0 "$@"; }
 
+function set_recorder_start         () { set_routes        $REC_CTRL $REC_CTRL_SET_START  "$@"; }
+function gen_set_recorder_start     () { gen_set_routes    $REC_CTRL $REC_CTRL_SET_START  "$@"; }
+function sysgen_set_recorder_start  () { sysgen_set_routes $REC_CTRL $REC_CTRL_SET_START  "$@"; }
+function set_recorder_stop          () { set_routes        $REC_CTRL $REC_CTRL_SET_STOP   "$@"; }
+function gen_set_recorder_stop      () { gen_set_routes    $REC_CTRL $REC_CTRL_SET_STOP   "$@"; }
+function sysgen_set_recorder_stop   () { sysgen_set_routes $REC_CTRL $REC_CTRL_SET_STOP   "$@"; }
+function set_recorder_record        () { set_routes        $REC_CTRL $REC_CTRL_SET_RECORD "$@"; }
+function gen_set_recorder_record    () { gen_set_routes    $REC_CTRL $REC_CTRL_SET_RECORD "$@"; }
+function sysgen_set_recorder_record () { sysgen_set_routes $REC_CTRL $REC_CTRL_SET_RECORD "$@"; }
+
+function checkargs_recorder () {
+	if (($# != 0)); then
+		return 1
+	fi
+}
+
+function recorder_start () {
+	local gen; gen=$(gen_recorder_start "$@") || return $?
+	run >/dev/null < <(echo "$gen")
+}
+
+function gen_recorder_start () {
+	checkargs_recorder "$@" || return $?
+	echo "wr $REC_CTRL $REC_CTRL_START"
+}
+
+function sysgen_recorder_start () {
+	checkargs_recorder "$@" || return $?
+	echo "
+		ld a, $REC_CTRL_START
+		ld ($REC_CTRL), a
+	"
+}
+
+function recorder_stop () {
+	local gen; gen=$(gen_recorder_stop "$@") || return $?
+	run >/dev/null < <(echo "$gen")
+}
+
+function gen_recorder_stop () {
+	checkargs_recorder "$@" || return $?
+	echo "wr $REC_CTRL $REC_CTRL_STOP"
+}
+
+function sysgen_recorder_stop () {
+	checkargs_recorder "$@" || return $?
+	echo "
+		ld a, $REC_CTRL_STOP
+		ld ($REC_CTRL), a
+	"
+}
+
+function record () {
+	local gen; gen=$(gen_record "$@") || return $?
+	run >/dev/null < <(echo "$gen")
+}
+
+function gen_record () {
+	checkargs_recorder "$@" || return $?
+	echo "wr $REC_CTRL $REC_CTRL_RECORD"
+}
+
+function sysgen_record () {
+	checkargs_recorder "$@" || return $?
+	echo "
+		ld a, $REC_CTRL_RECORD
+		ld ($REC_CTRL), a
+	"
+}
+
+function checkargs_recorder_adr () {
+	if (($# != 1)) || ! isint "$1"; then
+		return 1
+	fi
+}
+
+function set_recorder_adr () {
+	local gen; gen=$(gen_set_recorder_adr "$@") || return $?
+	run >/dev/null < <(echo "$gen")
+}
+
+function gen_set_recorder_adr () {
+	checkargs_recorder_adr "$@" || return $?; local adr=$1
+	gen_set_atom $adr || return $?
+	echo "wr $REC_CTRL $REC_CTRL_SET_ADR"
+}
+
+function sysgen_set_recorder_adr () {
+	checkargs_recorder_adr "$@" || return $?; local adr=$1
+	sysgen_set_atom $adr || return $?
+	echo "
+		ld a, $REC_CTRL_SET_ADR
+		ld ($REC_CTRL), a
+	"
+}
+
 function checkargs_counter_routes () {
 	if (($# < 1)) || ! isint "$1"; then
 		return 1
