@@ -1,3 +1,5 @@
+SHIVA_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null && pwd)
+
 SYSRAM_START=$(( 0x0000 ))
 DUTRAM_START=$(( 0x1000 ))
 RECRAM_START=$(( 0x2000 ))
@@ -31,8 +33,10 @@ REC_CTRL_START=$((      1 << 3 ))
 REC_CTRL_STOP=$((       1 << 4 ))
 REC_CTRL_RECORD=$((     1 << 5 ))
 REC_CTRL_SET_ADR=$((    1 << 7 ))
+REC_CFG=$(( 0xff16 ))
+REC_CFG_CYCLIC=$(( 1 << 0 ))
 
-NUM_COUNTERS=2
+NUM_COUNTERS=1
 COUNTER_BASE=( $((0xff20)) $((0xff24)) )
 COUNTER_COUNT_OFFSET=0
 COUNTER_CTRL_OFFSET=0
@@ -551,6 +555,11 @@ function init () {
 			# Reset DUT connector
 			wr $DUT_CMP_OUT 0xff
 			wr $DUT_CTRL    $((DUT_CTRL_RESET_DATA | DUT_CTRL_RESET_RESET))
+
+			# Reset recorder
+			wr $REC_CTRL $((REC_CTRL_SET_START | REC_CTRL_SET_STOP | REC_CTRL_SET_RECORD))
+			wr $REC_CTRL $((REC_CTRL_STOP | REC_CTRL_SET_ADR))
+			wr $REC_CFG  0
 
 			# Reset interrupts flags
 			wr $IFLAG 0
@@ -1249,13 +1258,52 @@ function sys_run () {
 }
 
 function dut_run () {
-	if (($# != 1 && $# != 2)); then
+	local pos=0
+	local adr=
+	local timeout=
+	local rec=
+	local fast_rec=
+	while (($#)); do
+		case "$1" in
+		-*)
+			case "$1" in
+			--rec)
+				rec=y
+				;;
+			--rec-fast)
+				rec=y
+				fast_rec=y
+				;;
+			*)
+				echo Unknown option >&2
+				return 1
+				;;
+			esac
+			;;
+		*)
+			if ((pos == 0)); then
+				adr=$1
+			elif ((pos == 1)); then
+				timeout=$1
+			else
+				echo Too many arguments >&2
+				return 1
+			fi
+			((pos++))
+			;;
+		esac
+		shift
+	done
+	if ((pos < 1)); then
+		echo Too few arguments >&2
 		return 1
 	fi
-
-	local adr=$1
-	local timeout=${2--1}
-	if ! isint "$adr" || ! isint "$timeout"; then
+	if ! isint "$adr"; then
+		echo Address not a number >&2
+		return 1
+	fi
+	if ((pos > 1)) && ! isint "$timeout"; then
+		echo Timeout not a number >&2
 		return 1
 	fi
 
@@ -1270,125 +1318,166 @@ function dut_run () {
 	fi
 
 	local scode
-	scode=$(echo "
-		; Only output NOPs on data lines when DUT reads from cartridge
-		$(sysgen_dut_override_data 0)
+	scode=$(
+		if [ -n "$rec" ]; then
+			echo "
+				; Make sure trigger inputs of recorder are disconnected and recorder is stopped at adr 0
+				$(sysgen_set_atom 0)
+				ld a, $((REC_CTRL_SET_START | REC_CTRL_SET_STOP | REC_CTRL_SET_RECORD))
+				ld ($REC_CTRL), a
+				ld a, $((REC_CTRL_STOP | REC_CTRL_SET_ADR))
+				ld ($REC_CTRL), a
+			"
 
-		; Clock "manually" for seven memory cycles, so CPU finishes current instruction and read NOPs
-		ld b, $((7 * 4))
-	clk_loop:
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
-		dec b
-		jr nz, clk_loop
+			# Configure recorder triggers
+			if [ -n "$fast_rec" ]; then
+				sysgen_set_recorder_record 3
+				sysgen_set_recorder_stop   2
+			else
+				sysgen_set_recorder_record 0 1
+				sysgen_set_recorder_stop   2
+			fi
+		fi
 
-		; Clock "manually" until PHI has falling edge, so we know that we are at the beginning of a memory cycle
-	phi0:
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
-		ld a, ($DUT_IN)
-		bit $DUT_IN_PHI_POS, a
-		jr z, phi0
-	phi1:
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
-		ld a, ($DUT_IN)
-		bit $DUT_IN_PHI_POS, a
-		jr nz, phi1
+		echo "
+			; Only output NOPs on data lines when DUT reads from cartridge
+			$(sysgen_dut_override_data 0)
 
-		; Output JP instruction to DUT
-		$(sysgen_dut_override_data $((0xc3)))
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
+			; Clock "manually" for seven memory cycles, so CPU finishes current instruction and read NOPs
+			ld b, $((7 * 4))
+		clk_loop:
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
+			dec b
+			jr nz, clk_loop
 
-		; Output LSB of address to DUT
-		$(sysgen_dut_override_data $((adr & 0xff)))
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
+			; Clock "manually" until PHI has rising edge, so we know that we are at the beginning of a memory cycle
+		phi1:
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
+			ld a, ($DUT_IN)
+			bit $DUT_IN_PHI_POS, a
+			jr nz, phi1
+		phi0:
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
+			ld a, ($DUT_IN)
+			bit $DUT_IN_PHI_POS, a
+			jr z, phi0
 
-		; Output MSB of address to DUT
-		$(sysgen_dut_override_data $((adr >> 8)))
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
+			; Output JP instruction to DUT
+			$(sysgen_dut_override_data $((0xc3)))
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
 
-		; Stop overriding DUT data lines
-		$(sysgen_dut_override_data)
+			; Output LSB of address to DUT
+			$(sysgen_dut_override_data $((adr & 0xff)))
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
 
-		; Finish the jump.
-		; We have to make sure the jump is finished before setting up the comparator, just in case
-		; the PC is currently at our "jr -2" instruction at the end. In that rare case, we would immediately
-		; get triggered by the comparator and think we are already finished executing the code, when in fact we
-		; haven't even started.
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
-		$(sysgen_reset_porta $((0x01)))
-		$(sysgen_set_porta   $((0x01)))
+			; Output MSB of address to DUT
+			$(sysgen_dut_override_data $((adr >> 8)))
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
 
-		; Trigger when DUT reads address off the "jr -2" instruction we've placed at the end
-		$(sysgen_set_dut_comparator 0 $((
-			(adr + len - 2) << DUT_BIT_ADR_SHIFT |
-			DUT_BIT_CS_ROM |
-			DUT_BIT_DATA_OUT_DIR |
-			DUT_BIT_RD
-		)) $((
-			DUT_BIT_ADR_MASK |
-			DUT_BIT_CS_ROM |
-			DUT_BIT_DATA_OUT_DIR |
-			DUT_BIT_CS_RAM |
-			DUT_BIT_RD |
-			DUT_BIT_WR |
-			DUT_BIT_RST
-		)))
+			; Stop overriding DUT data lines
+			$(sysgen_dut_override_data)
 
-		; Route 2 carries DUT bus compare match to counter 0 STOP and RESET
-		$(sysgen_set_dut_match     0   2)
-		$(sysgen_set_counter_stop  0   2)
-		$(sysgen_set_counter_reset 0 1 2)
+			; Finish the jump.
+			; We have to make sure the jump is finished before setting up the comparator, just in case
+			; the PC is currently at our "jr -2" instruction at the end. In that rare case, we would immediately
+			; get triggered by the comparator and think we are already finished executing the code, when in fact we
+			; haven't even started.
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
+			$(sysgen_reset_porta $((0x01)))
+			$(sysgen_set_porta   $((0x01)))
 
-		; Clear interrupt flags
-		xor a
-		ld ($IFLAG), a
+			; Trigger when DUT reads address off the "jr -2" instruction we've placed at the end
+			$(sysgen_set_dut_comparator 0 $((
+				(adr + len - 2) << DUT_BIT_ADR_SHIFT |
+				DUT_BIT_CS_ROM |
+				DUT_BIT_DATA_OUT_DIR |
+				DUT_BIT_RD
+			)) $((
+				DUT_BIT_ADR_MASK |
+				DUT_BIT_CS_ROM |
+				DUT_BIT_DATA_OUT_DIR |
+				DUT_BIT_CS_RAM |
+				DUT_BIT_RD |
+				DUT_BIT_WR |
+				DUT_BIT_RST
+			)))
 
-		; Start Counter 0 again
-		$(sysgen_start_counter 0)
+			; Route 2 carries DUT bus compare match to counter 0 STOP and RESET (and maybe recorder STOP)
+			$(sysgen_set_dut_match     0   2)
+			$(sysgen_set_counter_stop  0   2)
+			$(sysgen_set_counter_reset 0 1 2)
 
-		; Wait for match
-		ld hl, $IFLAG
-	loop:
-		ld a, (hl)
-		bit 2, a
-		jr z, loop
+			; Clear interrupt flags
+			xor a
+			ld ($IFLAG), a
+		"
 
-		; Disconnect route 2 on both ends
-		$(sysgen_set_dut_match     0)
-		$(sysgen_set_counter_stop  0)
-		$(sysgen_set_counter_reset 0 1)
+		# Start recording
+		if [ -n "$rec" ]; then
+			if [ -n "$fast_rec" ]; then
+				sysgen_set_recorder_start 0 1
+			else
+				sysgen_recorder_start
+			fi
+		fi
 
-		; Start Counter 0 again
-		$(sysgen_start_counter 0)
-	")
+		echo "
+			; Start Counter 0 again
+			$(sysgen_start_counter 0)
+
+			; Wait for match
+			ld hl, $IFLAG
+		loop:
+			ld a, (hl)
+			bit 2, a
+			jr z, loop
+
+			; Disconnect route 2 on both ends
+			$(sysgen_set_dut_match     0)
+			$(sysgen_set_counter_stop  0)
+			$(sysgen_set_counter_reset 0 1)
+
+			; Start Counter 0 again
+			$(sysgen_start_counter 0)
+		"
+
+		# Disconnect recorder triggers and make sure recording actually stopped
+		if [ -n "$rec" ]; then
+			sysgen_set_recorder_start
+			sysgen_recorder_stop
+			sysgen_set_recorder_record
+			sysgen_set_recorder_stop
+		fi
+	)
 
 	if ((!res)); then
 		restore_routes=1
@@ -1398,15 +1487,23 @@ function dut_run () {
 	# Make sure DUT is getting clocked again, even in the case of an error
 	if ((res)); then
 		if ((restore_routes)); then
-			sys_run $((0x100)) 2 < <(echo "
-				; Disconnect route 2 on both ends
-				$(sysgen_set_dut_match     0)
-				$(sysgen_set_counter_stop  0)
-				$(sysgen_set_counter_reset 0 1)
+			sys_run $((0x100)) 2 < <(
+				# Disconnect route 2 on both ends
+				sysgen_set_dut_match     0
+				sysgen_set_counter_stop  0
+				sysgen_set_counter_reset 0 1
 
-				; Start Counter 0 again
-				$(sysgen_start_counter 0)
-			")
+				# Start Counter 0 again
+				sysgen_start_counter 0
+
+				# Disconnect recorder triggers and stop recording
+				if [ -n "$rec" ]; then
+					sysgen_set_recorder_start
+					sysgen_recorder_stop
+					sysgen_set_recorder_record
+					sysgen_set_recorder_stop
+				fi
+			)
 		else
 			start_dut_clock
 		fi
@@ -1800,4 +1897,274 @@ function dut_dump () {
 		len=$((len - l))
 		adr=$((adr + l))
 	done
+}
+
+function read_binary_uint32 () {
+	local v
+	v=$(od -A n -N 4 -t u4) || return $?
+	v=$(echo $v) # Remove leading space
+	isint "$v" || return $?
+	echo $v
+}
+
+function read_decimal_uint32 () {
+	local v
+	read v || return $?
+	isint "$v" || return $?
+	echo $v
+}
+
+function read_uint32 () {
+	if [ "$1" == --bin ]; then
+		read_binary_uint32
+	elif (($# == 0)); then
+		read_decimal_uint32
+	else
+		return 1
+	fi
+}
+
+function dump_vcd_values () {
+	local v=$1
+	local pv=$2
+	if (((v & 0xffff) != (pv & 0xffff))); then
+		echo -n b
+		echo -n $(((v & 0x8000) == 0))
+		echo -n $(((v & 0x4000) != 0))
+		echo -n $(((v & 0x2000) != 0))
+		echo -n $(((v & 0x1000) != 0))
+		echo -n $(((v & 0x0800) != 0))
+		echo -n $(((v & 0x0400) != 0))
+		echo -n $(((v & 0x0200) != 0))
+		echo -n $(((v & 0x0100) != 0))
+		echo -n $(((v & 0x0080) != 0))
+		echo -n $(((v & 0x0040) != 0))
+		echo -n $(((v & 0x0020) != 0))
+		echo -n $(((v & 0x0010) != 0))
+		echo -n $(((v & 0x0008) != 0))
+		echo -n $(((v & 0x0004) != 0))
+		echo -n $(((v & 0x0002) != 0))
+		echo -n $(((v & 0x0001) != 0))
+		echo ' a'
+	fi
+	v=$((v >> 16))
+	pv=$((pv >> 16))
+	if (((v & 0xff) != (pv & 0xff))); then
+		echo -n b
+		echo -n $(((v & 0x80) != 0))
+		echo -n $(((v & 0x40) != 0))
+		echo -n $(((v & 0x20) != 0))
+		echo -n $(((v & 0x10) != 0))
+		echo -n $(((v & 0x08) != 0))
+		echo -n $(((v & 0x04) != 0))
+		echo -n $(((v & 0x02) != 0))
+		echo -n $(((v & 0x01) != 0))
+		echo ' d'
+	fi
+	v=$((v >> 8))
+	pv=$((pv >> 8))
+	if (((v & 0x01) != (pv & 0x01))); then
+		echo $(((v & 0x01) != 0))o
+	fi
+	if (((v & 0x02) != (pv & 0x02))); then
+		echo $(((v & 0x02) == 0))c
+	fi
+	if (((v & 0x04) != (pv & 0x04))); then
+		echo $(((v & 0x04) == 0))r
+	fi
+	if (((v & 0x08) != (pv & 0x08))); then
+		echo $(((v & 0x08) == 0))w
+	fi
+	if (((v & 0x10) != (pv & 0x10))); then
+		echo $(((v & 0x10) != 0))p
+	fi
+	if (((v & 0x20) != (pv & 0x20))); then
+		echo $(((v & 0x20) == 0))t
+	fi
+	if (((v & 0x40) != (pv & 0x40))); then
+		echo $(((v & 0x40) != 0))k
+	fi
+}
+
+function generate_vcd () {
+	local fast=
+	local bin=
+	while (($#)); do
+		case "$1" in
+		--fast)
+			fast=y
+			;;
+		--bin)
+			bin=--bin
+			;;
+		*)
+			echo Unknown option >&2
+			return 1
+			;;
+		esac
+		shift
+	done
+
+	local step=2381  # time step for 4.2 MHz in 100 ps units
+	if [ -n "$fast" ]; then
+		step=152  # time step for 66 MHz in 100 ps units
+	fi
+
+	local v
+	local pv
+	local t=0
+
+	echo '$date'
+	echo -n $'\t'
+	date
+	echo '$end'
+	echo '$version'
+	echo $'\tShiva'
+	echo '$end'
+	echo '$timescale'
+	echo $'\t100ps'
+	echo '$end'
+	echo '$scope module dut_bus $end'
+	echo '$var wire 16 a a [15:0] $end'
+	echo '$var wire 8 d d [7:0] $end'
+	echo '$var wire 1 o dir $end'
+	echo '$var wire 1 c ~cs $end'
+	echo '$var wire 1 r ~rd $end'
+	echo '$var wire 1 w ~wr $end'
+	echo '$var wire 1 p phi $end'
+	echo '$var wire 1 t ~rst $end'
+	echo '$var wire 1 k xi $end'
+	echo '$upscope $end'
+	echo '$enddefinitions $end'
+
+	echo '$dumpvars'
+	v=$(read_uint32 $bin)
+	dump_vcd_values $v $((v ^ 0x7fffffff))
+	pv=$v
+	echo '$end'
+
+	while v=$(read_uint32 $bin); do
+		t=$((t + step))
+		if ((v == pv)); then
+			continue
+		fi
+		echo '#'$t
+		dump_vcd_values $v $pv
+		pv=$v
+	done
+}
+
+function rec_dump () {
+	if (($# > 1)); then
+		echo Too many arguments >&2
+		return 1
+	fi
+
+	local pos=${1-0}
+	if ! isint "$pos"; then
+		echo Pos not an integer >&2
+		return 1
+	fi
+
+	local v
+	local l
+	local end_of_rec=
+
+	if ((pos * 4 >= RECRAM_LEN)); then
+		echo Pos too large >&2
+		return 1
+	fi
+
+	while [ -z "$end_of_rec" ]; do
+		if ((pos * 4 >= RECRAM_LEN)); then
+			break
+		fi
+
+		l=$((RECRAM_LEN / 4 - pos))
+		if ((l > 64)); then
+			l=64
+		fi
+
+		while v=$(read_binary_uint32); do
+			echo $v
+
+			if ((v & 0x80000000)); then
+				end_of_rec=y
+				break
+			fi
+		done < <(sys_dump $((RECRAM_START + pos * 4)) $((l * 4)) --bin)
+
+		pos=$((pos + l))
+	done
+}
+
+function capture () {
+	local fast=
+	local rec=--rec
+	local gui=
+	local adr=
+	while (($#)); do
+		if isint "$1"; then
+			if [ -z "$adr" ]; then
+				adr=$1
+				shift
+				continue
+			fi
+		fi
+		case "$1" in
+		--fast)
+			fast=--fast
+			rec=--rec-fast
+			;;
+		--gui)
+			gui=y
+			;;
+		--)
+			shift
+			break
+			;;
+		*)
+			break
+			;;
+		esac
+		shift
+	done
+
+	if [ -z "$adr" ]; then
+		adr=$((0x200))
+	fi
+
+	dut_run $adr $rec < <(
+		if (($# == 0)); then
+			set -- -
+		fi
+		used_stdin=
+		while (($#)); do
+			if [ "$1" == - ] && [ -z "$used_stdin" ]; then
+				echo
+				cat
+				echo
+				used_stdin=y
+			else
+				echo "$1"
+			fi
+			shift
+		done
+	) || return $?
+
+	if [ -n "$gui" ]; then
+		local tempfile=
+		local ret=0
+		tempfile=$(mktemp)
+		rec_dump > >(generate_vcd $fast >"$tempfile") || ret=$?
+		if ((ret)); then
+			rm "$tempfile"
+			return $ret
+		fi
+		gtkwave "$tempfile" "$SHIVA_DIR/dut_bus.gtkw" || ret=$?
+		rm "$tempfile"
+		return $ret
+	else
+		rec_dump > >(generate_vcd $fast)
+	fi
 }

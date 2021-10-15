@@ -1,0 +1,61 @@
+[*]
+[*] GTKWave Analyzer v3.3.109 (w)1999-2020 BSI
+[*] Thu Oct 14 23:32:24 2021
+[*]
+[dumpfile] "/tmp/tmp.mlZkvPd1kq"
+[dumpfile_mtime] "Thu Oct 14 23:30:06 2021"
+[dumpfile_size] 808
+[savefile] "/home/michael/projects/gbdbg/scripts/dut_bus.gtkw"
+[timestart] 0
+[size] 1280 964
+[pos] -1 -1
+*-20.000000 0 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 229
+[signals_width] 130
+[sst_expanded] 1
+[sst_vpaned_height] 270
+@28
+dut_bus.xi
+dut_bus.phi
+dut_bus.~rd
+dut_bus.~wr
+dut_bus.~cs
+@c00022
+dut_bus.a[15:0]
+@28
+(0)dut_bus.a[15:0]
+(1)dut_bus.a[15:0]
+(2)dut_bus.a[15:0]
+(3)dut_bus.a[15:0]
+(4)dut_bus.a[15:0]
+(5)dut_bus.a[15:0]
+(6)dut_bus.a[15:0]
+(7)dut_bus.a[15:0]
+(8)dut_bus.a[15:0]
+(9)dut_bus.a[15:0]
+(10)dut_bus.a[15:0]
+(11)dut_bus.a[15:0]
+(12)dut_bus.a[15:0]
+(13)dut_bus.a[15:0]
+(14)dut_bus.a[15:0]
+(15)dut_bus.a[15:0]
+@1401200
+-group_end
+@c00022
+dut_bus.d[7:0]
+@28
+(0)dut_bus.d[7:0]
+(1)dut_bus.d[7:0]
+(2)dut_bus.d[7:0]
+(3)dut_bus.d[7:0]
+(4)dut_bus.d[7:0]
+(5)dut_bus.d[7:0]
+(6)dut_bus.d[7:0]
+(7)dut_bus.d[7:0]
+@1401200
+-group_end
+@28
+dut_bus.dir
+dut_bus.~rst
+[pattern_trace] 1
+[pattern_trace] 0
