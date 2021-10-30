@@ -1415,7 +1415,7 @@ function dut_run () {
 			$(sysgen_reset_porta $((0x01)))
 			$(sysgen_set_porta   $((0x01)))
 
-			; Trigger when DUT reads address off the "jr -2" instruction we've placed at the end
+			; Trigger when DUT reads address of the "jr -2" instruction we've placed at the end
 			$(sysgen_set_dut_comparator 0 $((
 				(adr + len - 2) << DUT_BIT_ADR_SHIFT |
 				DUT_BIT_CS_ROM |
@@ -2005,7 +2005,7 @@ function generate_vcd () {
 		shift
 	done
 
-	local step=2381  # time step for 4.2 MHz in 100 ps units
+	local step=1190  # time step for 8.4 MHz in 100 ps units
 	if [ -n "$fast" ]; then
 		step=152  # time step for 66 MHz in 100 ps units
 	fi
