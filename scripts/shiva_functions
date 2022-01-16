@@ -505,6 +505,8 @@ function init () {
 
 		# Set Port A Pin 0, 6 and 7 to high, others to low
 		#  0: clk out
+		#  1: serial out (serial in of Game Boy Link Port)
+		#  2: serial clock (clock of Link Port)
 		#  6: T1
 		#  7: T2
 		wr $PA_SET   0xc1
@@ -1263,7 +1265,26 @@ function dut_run () {
 	local timeout=
 	local rec=
 	local fast_rec=
+	local ser_int=
+	local ser_val=0
 	while (($#)); do
+		if isint "$1"; then
+			if ((pos == 0)); then
+				adr=$1
+			elif ((pos == 1)); then
+				timeout=$1
+			elif ((pos == 2)); then
+				ser_int=$1
+			elif ((pos == 3)); then
+				ser_val=$1
+			else
+				echo Too many arguments >&2
+				return 1
+			fi
+			((++pos))
+			shift
+			continue
+		fi
 		case "$1" in
 		-*)
 			case "$1" in
@@ -1281,29 +1302,14 @@ function dut_run () {
 			esac
 			;;
 		*)
-			if ((pos == 0)); then
-				adr=$1
-			elif ((pos == 1)); then
-				timeout=$1
-			else
-				echo Too many arguments >&2
-				return 1
-			fi
-			((pos++))
+			echo Invalid argument >&2
+			return 1
 			;;
 		esac
 		shift
 	done
 	if ((pos < 1)); then
 		echo Too few arguments >&2
-		return 1
-	fi
-	if ! isint "$adr"; then
-		echo Address not a number >&2
-		return 1
-	fi
-	if ((pos > 1)) && ! isint "$timeout"; then
-		echo Timeout not a number >&2
 		return 1
 	fi
 
@@ -1448,6 +1454,41 @@ function dut_run () {
 			else
 				sysgen_recorder_start
 			fi
+		fi
+
+		if [ -n "$ser_int" ]; then
+			# Reset Link Port
+			sysgen_reset_porta 6
+
+			while ((ser_int > 0)); do
+				sysgen_record
+				sysgen_reset_porta 1
+				ser_int=$((ser_int - 1))
+				if ((!ser_int)); then
+					break
+				fi
+				sysgen_record
+				sysgen_set_porta 1
+				ser_int=$((ser_int - 1))
+			done
+
+			# Shift one byte into the Game Boy's Link Port
+			for ((i = 0; i < 8; i++)); do
+				if ((ser_val & $((0x80 >> i)))); then
+					sysgen_set_porta 2
+				else
+					sysgen_reset_porta 2
+				fi
+				echo nop
+				echo nop
+				sysgen_set_porta 4
+				echo nop
+				echo nop
+				sysgen_reset_porta 4
+			done
+			echo nop
+			echo nop
+			sysgen_reset_porta 2
 		fi
 
 		echo "
@@ -2099,17 +2140,31 @@ function rec_dump () {
 }
 
 function capture () {
+	local pos=0
 	local fast=
 	local rec=--rec
 	local gui=
 	local adr=
+	local timeout=
+	local ser_int=
+	local ser_val=
 	while (($#)); do
 		if isint "$1"; then
-			if [ -z "$adr" ]; then
+			if ((pos == 0)); then
 				adr=$1
-				shift
-				continue
+			elif ((pos == 1)); then
+				timeout=$1
+			elif ((pos == 2)); then
+				ser_int=$1
+			elif ((pos == 3)); then
+				ser_val=$1
+			else
+				echo Too many arguments >&2
+				return 1
 			fi
+			((++pos))
+			shift
+			continue
 		fi
 		case "$1" in
 		--fast)
@@ -2134,7 +2189,7 @@ function capture () {
 		adr=$((0x200))
 	fi
 
-	dut_run $adr $rec < <(
+	dut_run $adr $timeout $ser_int $ser_val $rec < <(
 		if (($# == 0)); then
 			set -- -
 		fi
