@@ -2148,6 +2148,8 @@ function capture () {
 	local timeout=
 	local ser_int=
 	local ser_val=
+	local ignore_err=
+	local ret_val=0
 	while (($#)); do
 		if isint "$1"; then
 			if ((pos == 0)); then
@@ -2173,6 +2175,9 @@ function capture () {
 			;;
 		--gui)
 			gui=y
+			;;
+		-k)
+			ignore_err=y
 			;;
 		--)
 			shift
@@ -2205,7 +2210,12 @@ function capture () {
 			fi
 			shift
 		done
-	) || return $?
+	) || {
+		ret_val=$?
+		if [ -z "$ignore_err" ]; then
+			return $ret_val
+		fi
+	}
 
 	if [ -n "$gui" ]; then
 		local tempfile=
