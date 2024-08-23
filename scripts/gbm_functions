@@ -1,0 +1,326 @@
+# Taken from https://github.com/sanni/cartreader/blob/master/Cart_Reader/GBM.ino
+function gbm_send () {
+	local cmd=$(($1))
+	local adr=$2
+	local data=$3
+
+	{
+		echo wr 0x0120 $cmd
+
+		# Cmds without args:
+		#  0x01: ???
+		#  0x02: Write enable Step 2
+		#  0x03: Undo write Step 2
+		#  0x04: Disable mapping; map entire flash
+		#  0x05: Enable mapping; restores mapping previously selected by 0xc<n> cmd
+		#  0x08: Disable access to Nintendo Power registers 0x120..0x13f
+		#  0x10: Disable access to MBC registers like 0x2100
+		#  0x11: Enable access to MBC registers like 0x2100
+		#  0xc<n>: Switch to mapping <n>; has no effect if mapping is disabled (0x04)
+
+		case "$cmd" in
+			$((0x09)))  # Enable access to NP registers 0x120..0x13f
+				echo wr 0x0121 0xaa
+				echo wr 0x0122 0x55
+				;;
+			$((0x0a)))  # Write enable Step 1
+				echo wr 0x0125 0x62
+				echo wr 0x0126 0x04
+				;;
+			$((0x0f)))  # Write address/byte to flash
+				echo wr 0x0125 $((adr >> 8))
+				echo wr 0x0126 $((adr & 0xff))
+				echo wr 0x0127 $((data))
+				;;
+		esac
+
+		echo wr 0x013f 0xa5
+	} | gbdbg $DEV
+}
+
+function gbm_detect () {
+	gbm_send 0x09
+	local tmp=$(echo rd 0x120 | gbdbg $DEV)
+	((tmp == 0x21))
+}
+
+function gbm_select_map_entry () {
+	local game_num=$1
+	gbm_send 0x09
+	gbm_send 0x05
+	gbm_send $((0xc0 | game_num))
+	gbm_send 0x11
+	echo wr 0x2100 1 | gbdbg $DEV
+	gbm_send 0x08
+}
+
+function gbm_unmap () {
+	gbm_send 0x09
+	gbm_send 0x04
+	gbm_send 0x11
+	echo wr 0x2100 1 | gbdbg $DEV
+	gbm_send 0x08
+}
+
+function gbm_reset_flash () {
+	gbm_send 0x09
+	gbm_send 0x0f 0x5555 0xaa
+	gbm_send 0x0f 0x2aaa 0x55
+	gbm_send 0x0f 0x5555 0xf0
+	sleep 0.1
+}
+
+function gbm_reset () {
+	gbm_send 0x09
+	gbm_send 0x04
+	gbm_send 0x11
+	echo wr 0x2100 1 | gbdbg $DEV
+	gbm_reset_flash
+	gbm_send 0x05
+	gbm_send 0xc0
+	gbm_send 0x08
+}
+
+function gbm_read_flash_id () {
+	gbm_send 0x09
+	echo wr 0x2100 1 | gbdbg $DEV
+	gbm_send 0x0f 0x5555 0xaa
+	gbm_send 0x0f 0x2aaa 0x55
+	gbm_send 0x0f 0x5555 0x90
+	local flashid=$(($(echo rd 0 | gbdbg $DEV) << 8))
+	flashid=$((flashid | $(echo rd 1 | gbdbg $DEV)))
+	gbm_reset_flash
+	printf 0x%04x $flashid
+}
+
+function gbm_wait_busy () {
+	local status=0
+	while (((status & 0x80) != 0x80)); do
+		status=$(echo rd 0 | gbdbg $DEV)
+	done
+}
+
+function gbm_erase_flash () {
+	gbm_send 0x09
+
+	# Enable write
+	gbm_send 0x0a
+	gbm_send 0x02
+
+	# Unprotect sector 0
+	gbm_send 0x0f 0x5555 0xaa
+	gbm_send 0x0f 0x2aaa 0x55
+	gbm_send 0x0f 0x5555 0x60
+	gbm_send 0x0f 0x5555 0xaa
+	gbm_send 0x0f 0x2aaa 0x55
+	gbm_send 0x0f 0x5555 0x40
+	gbm_wait_busy
+
+	# Erase flash
+	gbm_send 0x0f 0x5555 0xaa
+	gbm_send 0x0f 0x2aaa 0x55
+	gbm_send 0x0f 0x5555 0x80
+	gbm_send 0x0f 0x5555 0xaa
+	gbm_send 0x0f 0x2aaa 0x55
+	gbm_send 0x0f 0x5555 0x10
+	gbm_wait_busy
+
+	gbm_reset_flash
+}
+
+function gbm_write_flash () {
+	local verbose=
+	if [ "$1" == -v ]; then
+		verbose=y
+	fi
+	declare -a data
+	readarray -tn $((1024 * 1024)) data < <(hexdump -ve '/1 "%u\n"')
+	local idx=0
+	local cnt=${#data[*]}
+
+	gbm_send 0x09
+
+	# Enable write
+	gbm_send 0x0a
+	gbm_send 0x02
+
+	# Disable mapping
+	gbm_send 0x04
+
+	# Unprotect sector 0
+	gbm_send 0x0f 0x5555 0xaa
+	gbm_send 0x0f 0x2aaa 0x55
+	gbm_send 0x0f 0x5555 0x60
+	gbm_send 0x0f 0x5555 0xaa
+	gbm_send 0x0f 0x2aaa 0x55
+	gbm_send 0x0f 0x5555 0x40
+	gbm_wait_busy
+
+	local adr=0
+	local bank
+
+	for ((bank = 1; bank < 64 && idx < cnt; bank++)); do
+		if ((bank > 1)); then
+			((adr = 0x4000))
+
+			if [ -n "$verbose" ]; then
+				echo -n Writing bank $bank >&2
+			fi
+		else
+			if [ -n "$verbose" ]; then
+				echo -n Writing banks 0\&1 >&2
+			fi
+		fi
+
+		for ((; adr < 0x7fff; adr += 128)); do
+			gbm_send 0x09
+			gbm_send 0x11
+			echo wr 0x2100 1 | gbdbg $DEV
+			gbm_send 0x10
+			gbm_send 0x08
+
+			# Write flash buffer command
+			{
+				echo wr 0x5555 0xaa
+				echo wr 0x2aaa 0x55
+				echo wr 0x5555 0xa0
+			} | gbdbg $DEV
+			gbm_wait_busy
+
+			gbm_send 0x09
+			gbm_send 0x11
+			echo wr 0x2100 $bank | gbdbg $DEV
+			gbm_send 0x10
+			gbm_send 0x08
+
+			if [ -n "$verbose" ]; then
+				echo -n . >&2
+			fi
+
+			gbdbg $DEV < <(
+				for ((i = 0; i < 128; i++, idx++)); do
+					if ((idx < cnt)); then
+						echo wr $((adr + i)) ${data[idx]}
+					else
+						echo wr $((adr + i)) 0xff
+					fi
+				done
+			)
+			((idx += 128)) # update idx after subshell
+
+			# Execute write
+			echo wr $((adr + 127)) 0xff | gbdbg $DEV
+			gbm_wait_busy
+		done
+
+		if [ -n "$verbose" ]; then
+			echo >&2
+		fi
+	done
+}
+
+function gbm_unlock_map () {
+	gbm_send 0x09
+
+	# Enable write
+	gbm_send 0x0a
+	gbm_send 0x02
+
+	# Disable mapping
+	gbm_send 0x04
+	gbm_send 0x11
+	echo wr 0x2100 1 | gbdbg $DEV
+	gbm_send 0x10
+
+	# Enable map area
+	gbm_send 0x0f 0x5555 0xaa
+	gbm_send 0x0f 0x2aaa 0x55
+	gbm_send 0x0f 0x5555 0x77
+	gbm_send 0x0f 0x5555 0xaa
+	gbm_send 0x0f 0x2aaa 0x55
+	gbm_send 0x0f 0x5555 0x77
+
+	gbm_send 0x08
+}
+
+function gbm_erase_map () {
+	gbm_send 0x09
+
+	# Enable write
+	gbm_send 0x0a
+	gbm_send 0x02
+
+	# Unprotect sector 0
+	gbm_send 0x0f 0x5555 0xaa
+	gbm_send 0x0f 0x2aaa 0x55
+	gbm_send 0x0f 0x5555 0x60
+	gbm_send 0x0f 0x5555 0xaa
+	gbm_send 0x0f 0x2aaa 0x55
+	gbm_send 0x0f 0x5555 0x40
+	gbm_wait_busy
+
+	# Erase map
+	gbm_send 0x0f 0x5555 0xaa
+	gbm_send 0x0f 0x2aaa 0x55
+	gbm_send 0x0f 0x5555 0x60
+	gbm_send 0x0f 0x5555 0xaa
+	gbm_send 0x0f 0x2aaa 0x55
+	gbm_send 0x0f 0x5555 0x04
+	gbm_wait_busy
+
+	gbm_reset_flash
+}
+
+function gbm_write_map () {
+	declare -a data
+	readarray -tn 128 data < <(hexdump -ve '/1 "%u\n"')
+	local cnt=${#data[*]}
+
+	gbm_send 0x09
+
+	# Enable write
+	gbm_send 0x0a
+	gbm_send 0x02
+
+	# Disable mapping
+	gbm_send 0x04
+	gbm_send 0x11
+	echo wr 0x2100 1 | gbdbg $DEV
+
+	# Unprotect write to map
+	gbm_send 0x0f 0x5555 0xaa
+	gbm_send 0x0f 0x2aaa 0x55
+	gbm_send 0x0f 0x5555 0x60
+	gbm_send 0x0f 0x5555 0xaa
+	gbm_send 0x0f 0x2aaa 0x55
+	gbm_send 0x0f 0x5555 0xe0
+	gbm_wait_busy
+
+	gbm_send 0x10
+	gbm_send 0x08
+
+	# Write flash buffer command
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x2aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0xa0 | gbdbg $DEV
+	gbm_wait_busy
+
+	gbm_send 0x09
+	gbm_send 0x11
+	echo wr 0x2100 0 | gbdbg $DEV
+	gbm_send 0x10
+	gbm_send 0x08
+
+	local i
+	for ((i = 0; i < 128; i++)); do
+		if ((i < cnt)); then
+			echo wr $i ${data[i]}
+		else
+			echo wr $i 0xff
+		fi
+	done | gbdbg $DEV
+
+	# Execute write
+	echo wr 127 0xff | gbdbg $DEV
+	gbm_wait_busy
+}
