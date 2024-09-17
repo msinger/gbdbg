@@ -1,0 +1,365 @@
+function mbc6_enable_flash () {
+	echo wr 0x1000 1 | gbdbg $DEV
+	echo wr 0x0c00 1 | gbdbg $DEV
+	echo wr 0x1000 0 | gbdbg $DEV
+	echo wr 0x2800 8 | gbdbg $DEV
+	echo wr 0x3800 8 | gbdbg $DEV
+}
+
+function mbc6_disable_flash () {
+	echo wr 0x1000 1 | gbdbg $DEV
+	echo wr 0x0c00 0 | gbdbg $DEV
+	echo wr 0x1000 0 | gbdbg $DEV
+	echo wr 0x2800 0 | gbdbg $DEV
+	echo wr 0x3800 0 | gbdbg $DEV
+}
+
+function mbc6_reset_flash () {
+	mbc6_enable_flash
+	# We issue two reset commands to the same address in direct succession, just in case the flash chip
+	# is currently receiving data into its write buffer prior to a program operation. Two reset commands
+	# issued to the same address will cause exiting from this mode without starting the program operation.
+	echo wr 0x4000 0xf0 | gbdbg $DEV
+	echo wr 0x4000 0xf0 | gbdbg $DEV
+	sleep 0.1
+	# We try resetting the flash a third time after 100 ms, just in case there was a program or erase
+	# operation ongoing the first and second time. Reset has no effect during such an operation.
+	echo wr 0x4000 0xf0 | gbdbg $DEV
+}
+
+# Restores the state that the cartridge will have on power up.
+function mbc6_reset () {
+	echo wr 0x0000 0 | gbdbg $DEV
+	mbc6_reset_flash
+	mbc6_disable_flash
+	echo wr 0x0400 0 | gbdbg $DEV
+	echo wr 0x0800 1 | gbdbg $DEV
+	echo wr 0x2000 2 | gbdbg $DEV
+	echo wr 0x3000 3 | gbdbg $DEV
+}
+
+function mbc6_read_flash_id () {
+	mbc6_enable_flash
+	echo wr 0x2000 2    | gbdbg $DEV
+	echo wr 0x3000 1    | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x90 | gbdbg $DEV
+	local flashid=$(($(echo rd 0x4000 | gbdbg $DEV) << 8))
+	flashid=$((flashid | $(echo rd 0x4001 | gbdbg $DEV)))
+	mbc6_reset_flash
+	printf 0x%04x\\n $flashid
+}
+
+function mbc6_is_sector0_protected () {
+	mbc6_enable_flash
+	echo wr 0x2000 2    | gbdbg $DEV
+	echo wr 0x3000 1    | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0xa0 | gbdbg $DEV
+	local tmp=$(echo rd 0x4000 | gbdbg $DEV)
+	mbc6_reset_flash
+	return $(((tmp & 0x02) == 0))
+}
+
+function mbc6_wait_busy () {
+	local status=0
+	while (((status & 0x80) != 0x80)); do
+		status=$(echo rd 0x4000 | gbdbg $DEV)
+	done
+}
+
+function mbc6_protect_sector0 () {
+	mbc6_enable_flash
+	echo wr 0x2000 2 | gbdbg $DEV
+	echo wr 0x3000 1 | gbdbg $DEV
+
+	# Disable write protect
+	echo wr 0x1000 1 | gbdbg $DEV
+
+	# Protect sector 0 from erase and program operations
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x60 | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x20 | gbdbg $DEV
+	mbc6_wait_busy
+
+	# Enable write protect
+	echo wr 0x1000 0 | gbdbg $DEV
+
+	mbc6_reset_flash
+}
+
+function mbc6_unprotect_sector0 () {
+	mbc6_enable_flash
+	echo wr 0x2000 2 | gbdbg $DEV
+	echo wr 0x3000 1 | gbdbg $DEV
+
+	# Disable write protect
+	echo wr 0x1000 1 | gbdbg $DEV
+
+	# Remove sector 0 protection
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x60 | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x40 | gbdbg $DEV
+	mbc6_wait_busy
+
+	# Enable write protect
+	echo wr 0x1000 0 | gbdbg $DEV
+
+	mbc6_reset_flash
+}
+
+function mbc6_erase_flash () {
+	mbc6_enable_flash
+	echo wr 0x2000 2 | gbdbg $DEV
+	echo wr 0x3000 1 | gbdbg $DEV
+
+	# Disable write protect
+	echo wr 0x1000 1 | gbdbg $DEV
+
+	# Unprotect sector 0, allowing erase and program operations.
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x60 | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x40 | gbdbg $DEV
+	mbc6_wait_busy
+
+	# Erase flash
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x80 | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x10 | gbdbg $DEV
+	mbc6_wait_busy
+
+	# Enable write protect
+	echo wr 0x1000 0 | gbdbg $DEV
+
+	mbc6_reset_flash
+}
+
+function mbc6_erase_sector () {
+	local sector=$1
+
+	mbc6_enable_flash
+
+	# Select bank ((sector * 0x20000) / 0x2000) + 2
+	#  +2 because bank number needs to end in 0b10, so that A14 is high and A13 is low
+	#     if accessing address 0x4000-0x5fff
+	echo wr 0x2000 $((sector * 16 + 2)) | gbdbg $DEV
+	echo wr 0x3000 1 | gbdbg $DEV
+
+	# Disable write protect
+	echo wr 0x1000 1 | gbdbg $DEV
+
+	if ((sector == 0)); then
+		# Unprotect sector 0, allowing erase and program operations.
+		echo wr 0x5555 0xaa | gbdbg $DEV
+		echo wr 0x6aaa 0x55 | gbdbg $DEV
+		echo wr 0x5555 0x60 | gbdbg $DEV
+		echo wr 0x5555 0xaa | gbdbg $DEV
+		echo wr 0x6aaa 0x55 | gbdbg $DEV
+		echo wr 0x5555 0x40 | gbdbg $DEV
+		mbc6_wait_busy
+	fi
+
+	# Erase sector
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x80 | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x30 | gbdbg $DEV
+	mbc6_wait_busy
+
+	# Enable write protect
+	echo wr 0x1000 0 | gbdbg $DEV
+
+	mbc6_reset_flash
+}
+
+function mbc6_write_flash () {
+	local verbose=
+	if [ "$1" == -v ]; then
+		verbose=y
+	fi
+	declare -a data
+	readarray -tn $((1024 * 1024)) data < <(hexdump -ve '/1 "%u\n"')
+	local idx=0
+	local cnt=${#data[*]}
+
+	mbc6_enable_flash
+	echo wr 0x3000 1 | gbdbg $DEV
+
+	# Disable write protect
+	echo wr 0x1000 1 | gbdbg $DEV
+
+	local adr
+	local bank
+
+	for ((bank = 0; bank < 128 && idx < cnt; bank++)); do
+		if [ -n "$verbose" ]; then
+			echo -n Writing bank $bank >&2
+		fi
+
+		for ((adr = 0x4000; adr < 0x5fff; adr += 128)); do
+			if [ -n "$verbose" ]; then
+				echo -n . >&2
+			fi
+
+			gbdbg $DEV < <(
+				# Write flash buffer command
+				echo wr 0x2000 2
+				echo wr 0x5555 0xaa
+				echo wr 0x6aaa 0x55
+				echo wr 0x5555 0xa0
+				# Select bank
+				echo wr 0x2000 $bank
+
+				for ((i = 0; i < 128; i++, idx++)); do
+					if ((idx < cnt)); then
+						echo wr $((0x4000 + i)) ${data[idx]}
+					else
+						echo wr $((0x4000 + i)) 0xff
+					fi
+				done
+
+				# Execute write
+				echo wr $((adr + 127)) 0xff
+			)
+			((idx += 128)) # update idx after subshell
+			mbc6_wait_busy
+		done
+
+		if [ -n "$verbose" ]; then
+			echo >&2
+		fi
+	done
+
+	# Protect sector 0 from erase and program operations.
+	# TODO: All my Net de Get cartridges had empty flash, so I don't knoe if Net de Get
+	#       actually enables sector 0 protection when someone had installed some DLCs.
+	#       All those empty cartridges didn't have sector 0 protection enabled.
+	#       I need to find a cartridge on ebay that actually has contents in the flash
+	#       to see if sector 0 is protected then.
+	echo wr 0x2000 2    | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x60 | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x20 | gbdbg $DEV
+	mbc6_wait_busy
+
+	# Enable write protect
+	echo wr 0x1000 0 | gbdbg $DEV
+
+	mbc6_reset_flash
+}
+
+function mbc6_unlock_hidden () {
+	mbc6_enable_flash
+	echo wr 0x2000 2 | gbdbg $DEV
+	echo wr 0x3000 1 | gbdbg $DEV
+
+	# Enable map area
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x77 | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x77 | gbdbg $DEV
+}
+
+function mbc6_erase_hidden () {
+	mbc6_enable_flash
+	echo wr 0x2000 2 | gbdbg $DEV
+	echo wr 0x3000 1 | gbdbg $DEV
+
+	# Disable write protect
+	echo wr 0x1000 1 | gbdbg $DEV
+
+	# Erase map
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x60 | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x04 | gbdbg $DEV
+	mbc6_wait_busy
+
+	# Enable write protect
+	echo wr 0x1000 0 | gbdbg $DEV
+
+	mbc6_reset_flash
+}
+
+function mbc6_write_hidden () {
+	declare -a data
+	readarray -tn 256 data < <(hexdump -ve '/1 "%u\n"')
+	local cnt=${#data[*]}
+
+	mbc6_enable_flash
+	echo wr 0x2000 2 | gbdbg $DEV
+	echo wr 0x3000 1 | gbdbg $DEV
+
+	# Disable write protect
+	echo wr 0x1000 1 | gbdbg $DEV
+
+	# Initiate write to map
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x60 | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0xe0 | gbdbg $DEV
+
+	local i
+	for ((i = 0; i < 128; i++)); do
+		if ((i < cnt)); then
+			echo wr $((0x4000 + i)) ${data[i]}
+		else
+			echo wr $((0x4000 + i)) 0xff
+		fi
+	done | gbdbg $DEV
+
+	# Execute write
+	echo wr 0x407f 0xff | gbdbg $DEV
+	mbc6_wait_busy
+
+	# Initiate write to map
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x60 | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x6aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0xe0 | gbdbg $DEV
+
+	local i
+	for ((i = 0; i < 128; i++)); do
+		if ((i+128 < cnt)); then
+			echo wr $((0x4000 + i)) ${data[i+128]}
+		else
+			echo wr $((0x4000 + i)) 0xff
+		fi
+	done | gbdbg $DEV
+
+	# Execute write
+	echo wr 0x40ff 0xff | gbdbg $DEV
+	mbc6_wait_busy
+
+	# Enable write protect
+	echo wr 0x1000 0 | gbdbg $DEV
+
+	mbc6_reset_flash
+}

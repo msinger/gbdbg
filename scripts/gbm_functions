@@ -92,7 +92,7 @@ function gbm_read_flash_id () {
 	gbm_reset_flash
 	gbm_send 0x11
 	gbm_send 0x08
-	printf 0x%04x $flashid
+	printf 0x%04x\\n $flashid
 }
 
 function gbm_is_sector0_protected () {
@@ -197,6 +197,7 @@ function gbm_erase_flash () {
 	gbm_send 0x0a
 	gbm_send 0x02
 
+	# Unprotect sector 0, allowing erase and program operations.
 	echo wr 0x5555 0xaa | gbdbg $DEV
 	echo wr 0x2aaa 0x55 | gbdbg $DEV
 	echo wr 0x5555 0x60 | gbdbg $DEV
@@ -242,6 +243,7 @@ function gbm_erase_sector () {
 	gbm_send 0x02
 
 	if ((sector == 0)); then
+		# Unprotect sector 0, allowing erase and program operations.
 		echo wr 0x5555 0xaa | gbdbg $DEV
 		echo wr 0x2aaa 0x55 | gbdbg $DEV
 		echo wr 0x5555 0x60 | gbdbg $DEV
