@@ -54,7 +54,6 @@ function gbm_unmap () {
 	gbm_send 0x09
 	gbm_send 0x04
 	gbm_send 0x11
-	echo wr 0x2000 1 | gbdbg $DEV
 	gbm_send 0x08
 }
 
@@ -84,8 +83,6 @@ function gbm_reset () {
 function gbm_read_flash_id () {
 	gbm_send 0x09
 	gbm_send 0x04
-	gbm_send 0x11
-	echo wr 0x2000 1 | gbdbg $DEV
 	gbm_send 0x10
 	echo wr 0x5555 0xaa | gbdbg $DEV
 	echo wr 0x2aaa 0x55 | gbdbg $DEV
@@ -98,6 +95,22 @@ function gbm_read_flash_id () {
 	printf 0x%04x $flashid
 }
 
+function gbm_is_sector0_protected () {
+	gbm_send 0x09
+	gbm_send 0x04
+	gbm_send 0x10
+	gbm_send 0x0a
+	gbm_send 0x02
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x2aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0xa0 | gbdbg $DEV
+	local tmp=$(echo rd 0 | gbdbg $DEV)
+	gbm_reset_flash
+	gbm_send 0x11
+	gbm_send 0x08
+	return $(((tmp & 0x02) == 0))
+}
+
 function gbm_wait_busy () {
 	local status=0
 	while (((status & 0x80) != 0x80)); do
@@ -105,21 +118,92 @@ function gbm_wait_busy () {
 	done
 }
 
-function gbm_erase_flash () {
+function gbm_protect_sector0 () {
 	# Enable MMC registers
 	gbm_send 0x09
 
 	# Disable mapping
+	# Automatically selects ROM bank 1
 	gbm_send 0x04
 
-	# Select bank 1 so that A14 is high if accessing address 0x4000-0x7fff
-	gbm_send 0x11
-	echo wr 0x2000 1 | gbdbg $DEV
+	# Disable MBC registers
 	gbm_send 0x10
 
 	# Disable write protect
 	gbm_send 0x0a
 	gbm_send 0x02
+
+	# Protect sector 0 from erase and program operations
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x2aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x60 | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x2aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x20 | gbdbg $DEV
+	gbm_wait_busy
+
+	# Enable write protect
+	gbm_send 0x03
+
+	gbm_reset_flash
+	gbm_send 0x11
+	gbm_send 0x08
+}
+
+function gbm_unprotect_sector0 () {
+	# Enable MMC registers
+	gbm_send 0x09
+
+	# Disable mapping
+	# Automatically selects ROM bank 1
+	gbm_send 0x04
+
+	# Disable MBC registers
+	gbm_send 0x10
+
+	# Disable write protect
+	gbm_send 0x0a
+	gbm_send 0x02
+
+	# Remove sector 0 protection
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x2aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x60 | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x2aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x40 | gbdbg $DEV
+	gbm_wait_busy
+
+	# Enable write protect
+	gbm_send 0x03
+
+	gbm_reset_flash
+	gbm_send 0x11
+	gbm_send 0x08
+}
+
+function gbm_erase_flash () {
+	# Enable MMC registers
+	gbm_send 0x09
+
+	# Disable mapping
+	# Automatically selects ROM bank 1
+	gbm_send 0x04
+
+	# Disable MBC registers
+	gbm_send 0x10
+
+	# Disable write protect
+	gbm_send 0x0a
+	gbm_send 0x02
+
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x2aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x60 | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x2aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x40 | gbdbg $DEV
+	gbm_wait_busy
 
 	# Erase flash
 	echo wr 0x5555 0xaa | gbdbg $DEV
@@ -157,6 +241,16 @@ function gbm_erase_sector () {
 	gbm_send 0x0a
 	gbm_send 0x02
 
+	if ((sector == 0)); then
+		echo wr 0x5555 0xaa | gbdbg $DEV
+		echo wr 0x2aaa 0x55 | gbdbg $DEV
+		echo wr 0x5555 0x60 | gbdbg $DEV
+		echo wr 0x5555 0xaa | gbdbg $DEV
+		echo wr 0x2aaa 0x55 | gbdbg $DEV
+		echo wr 0x5555 0x40 | gbdbg $DEV
+		gbm_wait_busy
+	fi
+
 	# Erase sector
 	echo wr 0x5555 0xaa | gbdbg $DEV
 	echo wr 0x2aaa 0x55 | gbdbg $DEV
@@ -190,6 +284,9 @@ function gbm_write_flash () {
 	# Disable mapping
 	gbm_send 0x04
 
+	# Disable MBC registers
+	gbm_send 0x10
+
 	# Disable write protect
 	gbm_send 0x0a
 	gbm_send 0x02
@@ -216,13 +313,10 @@ function gbm_write_flash () {
 			fi
 
 			gbdbg $DEV < <(
-				# Enable MBC registers
-				echo wr 0x0120 0x11
-				echo wr 0x013f 0xa5
-				# Select bank 1
-				echo wr 0x2000 1
-				# Disable MBC registers
-				echo wr 0x0120 0x10
+				# We exploit the "disable MMC commands" command to select ROM bank 1 for us. This way
+				# we don't need to enable and disable MBC registers and can accomplish the same
+				# thing with fewer memory accesses.
+				echo wr 0x0120 0x04
 				echo wr 0x013f 0xa5
 				# Write flash buffer command
 				echo wr 0x5555 0xaa
@@ -257,6 +351,16 @@ function gbm_write_flash () {
 		fi
 	done
 
+	# Protect sector 0 from erase and program operations.
+	# ROM bank should already be odd (63).
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x2aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x60 | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x2aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x20 | gbdbg $DEV
+	gbm_wait_busy
+
 	# Enable write protect
 	gbm_send 0x03
 
@@ -270,11 +374,10 @@ function gbm_unlock_map () {
 	gbm_send 0x09
 
 	# Disable mapping
+	# Automatically selects ROM bank 1
 	gbm_send 0x04
 
-	# Select bank 1 so that A14 is high if accessing address 0x4000-0x7fff
-	gbm_send 0x11
-	echo wr 0x2100 1 | gbdbg $DEV
+	# Disable MBC registers
 	gbm_send 0x10
 
 	# Enable map area
@@ -294,11 +397,10 @@ function gbm_erase_map () {
 	gbm_send 0x09
 
 	# Disable mapping
+	# Automatically selects ROM bank 1
 	gbm_send 0x04
 
-	# Select bank 1 so that A14 is high if accessing address 0x4000-0x7fff
-	gbm_send 0x11
-	echo wr 0x2100 1 | gbdbg $DEV
+	# Disable MBC registers
 	gbm_send 0x10
 
 	# Disable write protect
@@ -324,18 +426,17 @@ function gbm_erase_map () {
 
 function gbm_write_map () {
 	declare -a data
-	readarray -tn 128 data < <(hexdump -ve '/1 "%u\n"')
+	readarray -tn 256 data < <(hexdump -ve '/1 "%u\n"')
 	local cnt=${#data[*]}
 
 	# Enable MMC registers
 	gbm_send 0x09
 
 	# Disable mapping
+	# Automatically selects ROM bank 1
 	gbm_send 0x04
 
-	# Select bank 1 so that A14 is high if accessing address 0x4000-0x7fff
-	gbm_send 0x11
-	echo wr 0x2100 1 | gbdbg $DEV
+	# Disable MBC registers
 	gbm_send 0x10
 
 	# Disable write protect
@@ -361,6 +462,27 @@ function gbm_write_map () {
 
 	# Execute write
 	echo wr 127 0xff | gbdbg $DEV
+	gbm_wait_busy
+
+	# Initiate write to map
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x2aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0x60 | gbdbg $DEV
+	echo wr 0x5555 0xaa | gbdbg $DEV
+	echo wr 0x2aaa 0x55 | gbdbg $DEV
+	echo wr 0x5555 0xe0 | gbdbg $DEV
+
+	local i
+	for ((i = 0; i < 128; i++)); do
+		if ((i+128 < cnt)); then
+			echo wr $i ${data[i+128]}
+		else
+			echo wr $i 0xff
+		fi
+	done | gbdbg $DEV
+
+	# Execute write
+	echo wr 255 0xff | gbdbg $DEV
 	gbm_wait_busy
 
 	# Enable write protect

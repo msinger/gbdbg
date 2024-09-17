@@ -47,6 +47,13 @@ if ((flashid != 0xc289)); then
 	exit 1
 fi
 
+echo Reading flash sector 0 protection... >&2
+if gbm_is_sector0_protected; then
+	echo Sector 0 protected: yes >&2
+else
+	echo Sector 0 protected: no >&2
+fi
+
 echo Disable mapping\; makes entire flash\&RAM accessible... >&2
 gbm_unmap
 

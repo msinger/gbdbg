@@ -60,6 +60,13 @@ if ((flashid != 0xc289)); then
 	exit 1
 fi
 
+echo Reading flash sector 0 protection... >&2
+if gbm_is_sector0_protected; then
+	echo Sector 0 protected: yes >&2
+else
+	echo Sector 0 protected: no >&2
+fi
+
 if [ -n "$opt_reset" ]; then
 	echo Resetting GBM... >&2
 	gbm_reset
@@ -81,7 +88,7 @@ if [ -n "$dump_map" ]; then
 
 	echo Reading map...
 	gbdbg $DEV <<EOF
-buf a mem 0+128
+buf a mem 0+256
 buf a save $tmpfile
 EOF
 	cat "$tmpfile" >&3
@@ -96,7 +103,7 @@ if [ -n "$dump_flash" ]; then
 
 	for (( i = 0; i < 64; i++ )); do
 		echo Reading block $i...
-		echo wr 0x2100 $i | gbdbg $DEV
+		echo wr 0x2000 $i | gbdbg $DEV
 		srcadr=0x4000
 		if (( i == 0 )); then
 			srcadr=0
