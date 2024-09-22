@@ -100,7 +100,7 @@ function gbm_is_sector0_protected () {
 	gbm_send 0x04
 	gbm_send 0x10
 	gbm_send 0x0a
-	gbm_send 0x02
+	gbm_send 0x03
 	echo wr 0x5555 0xaa | gbdbg $DEV
 	echo wr 0x2aaa 0x55 | gbdbg $DEV
 	echo wr 0x5555 0xa0 | gbdbg $DEV
