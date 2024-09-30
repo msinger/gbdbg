@@ -353,8 +353,12 @@ function gbm_write_flash () {
 		fi
 	done
 
+	# Disable mapping; automatically selects ROM bank 1
+	# which is required for the "protect sector 0" command
+	# sequence.
+	gbm_send 0x04
+
 	# Protect sector 0 from erase and program operations.
-	# ROM bank should already be odd (63).
 	echo wr 0x5555 0xaa | gbdbg $DEV
 	echo wr 0x2aaa 0x55 | gbdbg $DEV
 	echo wr 0x5555 0x60 | gbdbg $DEV
