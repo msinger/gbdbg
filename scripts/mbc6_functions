@@ -1,13 +1,10 @@
 function mbc6_enable_flash () {
-	echo wr 0x1000 1 | gbdbg $DEV
 	echo wr 0x0c00 1 | gbdbg $DEV
-	echo wr 0x1000 0 | gbdbg $DEV
 	echo wr 0x2800 8 | gbdbg $DEV
 	echo wr 0x3800 8 | gbdbg $DEV
 }
 
 function mbc6_disable_flash () {
-	echo wr 0x1000 1 | gbdbg $DEV
 	echo wr 0x0c00 0 | gbdbg $DEV
 	echo wr 0x1000 0 | gbdbg $DEV
 	echo wr 0x2800 0 | gbdbg $DEV
@@ -53,6 +50,7 @@ function mbc6_read_flash_id () {
 
 function mbc6_is_sector0_protected () {
 	mbc6_enable_flash
+	echo wr 0x1000 0    | gbdbg $DEV
 	echo wr 0x2000 2    | gbdbg $DEV
 	echo wr 0x3000 1    | gbdbg $DEV
 	echo wr 0x5555 0xaa | gbdbg $DEV
