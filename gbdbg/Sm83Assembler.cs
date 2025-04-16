@@ -1267,26 +1267,26 @@ namespace gbdbg
 		private void Enqueue(byte b)
 		{
 			fifo.Enqueue(new byte[] { b });
-			unchecked(org)++;
+			unchecked{org++;}
 		}
 
 		private void EnqueueAbs16(string name)
 		{
 			fifo.Enqueue(new Reloc(name, RelocType.AbsoluteAddress16));
-			unchecked(org)++;
-			unchecked(org)++;
+			unchecked{org++;}
+			unchecked{org++;}
 		}
 
 		private void EnqueueAbs8(string name)
 		{
 			fifo.Enqueue(new Reloc(name, RelocType.AbsoluteAddress8));
-			unchecked(org)++;
+			unchecked{org++;}
 		}
 
 		private void EnqueueRel8(string name, ushort refAdr)
 		{
 			fifo.Enqueue(new Reloc(name, refAdr));
-			unchecked(org)++;
+			unchecked{org++;}
 		}
 	}
 }
